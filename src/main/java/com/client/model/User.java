@@ -2,25 +2,24 @@ package com.client.model;
 
 import java.time.Instant;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class User {
     private Long id;
     private String username;
-    private String sessionId;
+    private String password;
     private String clientAddress;
     private String virtualIp;
-    private boolean active;
+    private String sessionId;
     private Instant lastActiveTime;
+    private boolean active;
 
-    public User() {}
-
-    public User(Long id, String username) {
-        this.id = id;
-        this.username = username;
-        this.active = true;
-        this.lastActiveTime = Instant.now();
+    // 构造函数
+    public User() {
     }
 
-    // Getters and setters
+    // getters和setters
     public Long getId() {
         return id;
     }
@@ -37,12 +36,12 @@ public class User {
         this.username = username;
     }
 
-    public String getSessionId() {
-        return sessionId;
+    public String getPassword() {
+        return password;
     }
 
-    public void setSessionId(String sessionId) {
-        this.sessionId = sessionId;
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     public String getClientAddress() {
@@ -61,12 +60,12 @@ public class User {
         this.virtualIp = virtualIp;
     }
 
-    public boolean isActive() {
-        return active;
+    public String getSessionId() {
+        return sessionId;
     }
 
-    public void setActive(boolean active) {
-        this.active = active;
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
     }
 
     public Instant getLastActiveTime() {
@@ -77,8 +76,11 @@ public class User {
         this.lastActiveTime = lastActiveTime;
     }
 
-    @Override
-    public String toString() {
-        return username + (active ? " (在线)" : " (离线)");
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

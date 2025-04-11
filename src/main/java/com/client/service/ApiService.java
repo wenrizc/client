@@ -7,6 +7,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,8 +15,11 @@ import java.util.Map;
 import com.client.config.AppConfig;
 import com.client.model.Room;
 import com.client.model.User;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 public class ApiService {
     private final String baseUrl;
@@ -26,7 +30,12 @@ public class ApiService {
 
     public ApiService(AppConfig config) {
         this.baseUrl = config.getServerUrl();
-        this.objectMapper = new ObjectMapper();
+
+        // 配置ObjectMapper以支持Java 8日期时间类型
+        this.objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())  // 添加Java时间模块支持
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);  // 忽略未知属性
+
         this.cookieManager = new CookieManager();
         this.httpClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
@@ -114,25 +123,20 @@ public class ApiService {
     public List<User> getAllActiveUsers() throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/api/users"))
-                .header("Cookie", "JSESSIONID=" + sessionId) // 添加会话ID Cookie
                 .GET()
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            System.err.println("获取用户列表失败，状态码: " + response.statusCode() + ", 响应: " + response.body());
-            return List.of();
+            throw new IOException("获取用户列表失败: " + response.statusCode());
         }
 
         try {
-            return objectMapper.readValue(
-                    response.body(),
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, User.class)
-            );
+            return objectMapper.readValue(response.body(), new TypeReference<List<User>>() {});
         } catch (Exception e) {
             System.err.println("解析用户列表响应失败: " + e.getMessage() + ", 响应内容: " + response.body());
-            throw e;
+            return new ArrayList<>(); // 返回空列表而不是抛出异常
         }
     }
 
@@ -143,27 +147,23 @@ public class ApiService {
     public List<Room> getJoinableRooms() throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/api/rooms"))
-                .header("Cookie", "JSESSIONID=" + sessionId)
                 .GET()
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            System.err.println("获取房间列表失败，状态码: " + response.statusCode() + ", 响应: " + response.body());
-            return List.of();
+            throw new IOException("获取房间列表失败: " + response.statusCode());
         }
 
         try {
-            return objectMapper.readValue(
-                    response.body(),
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, Room.class)
-            );
+            return objectMapper.readValue(response.body(), new TypeReference<List<Room>>() {});
         } catch (Exception e) {
             System.err.println("解析房间列表响应失败: " + e.getMessage());
-            throw e;
+            return new ArrayList<>(); // 返回空列表而不是抛出异常
         }
     }
+
     public Room createRoom(String roomName, String gameType, int maxPlayers) throws IOException, InterruptedException {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("roomName", roomName);

@@ -1,9 +1,12 @@
 package com.client.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
+@JsonIgnoreProperties(ignoreUnknown = true) // 忽略未知属性
 public class Room {
     private Long id;
     private String name;

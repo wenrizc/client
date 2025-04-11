@@ -20,6 +20,9 @@ import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
 import org.springframework.web.socket.client.WebSocketClient;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
+import org.springframework.web.socket.sockjs.client.SockJsClient;
+import org.springframework.web.socket.sockjs.client.Transport;
+import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 
 import com.client.config.AppConfig;
 import com.client.model.Message;
@@ -29,9 +32,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javafx.application.Platform;
-import org.springframework.web.socket.sockjs.client.SockJsClient;
-import org.springframework.web.socket.sockjs.client.Transport;
-import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 
 public class WebSocketService {
     private final String wsUrl;
@@ -106,6 +106,16 @@ public class WebSocketService {
         heartbeatScheduler.shutdownNow();
     }
 
+    public void logout() {
+        if (stompSession == null || !stompSession.isConnected()) {
+            System.err.println("WebSocket未连接，无法发送退出登录请求");
+            return;
+        }
+
+        stompSession.send("/app/user.logout", null);
+        System.out.println("已发送退出登录请求");
+    }
+
     private void startHeartbeatTask() {
         heartbeatScheduler.scheduleAtFixedRate(() -> {
             if (stompSession != null && stompSession.isConnected()) {
@@ -135,6 +145,34 @@ public class WebSocketService {
             Map<String, Object> connectMessage = new HashMap<>();
             connectMessage.put("username", username);
             session.send("/app/user.connect", connectMessage);
+
+            // 添加订阅错误消息通道
+            session.subscribe("/user/queue/errors", new StompFrameHandler() {
+                @Override
+                public Type getPayloadType(StompHeaders headers) {
+                    return JsonNode.class;
+                }
+
+                @Override
+                public void handleFrame(StompHeaders headers, Object payload) {
+                    try {
+                        JsonNode node = (JsonNode) payload;
+                        String type = node.path("type").asText();
+                        String message = node.path("message").asText();
+
+                        if ("CONNECTION_REJECTED".equals(type)) {
+                            Platform.runLater(() -> {
+                                // 创建一个错误事件或回调
+                                if (connectionErrorHandler != null) {
+                                    connectionErrorHandler.accept(message);
+                                }
+                            });
+                        }
+                    } catch (Exception e) {
+                        System.err.println("处理错误消息失败: " + e.getMessage());
+                    }
+                }
+            });
 
             // 订阅用户状态更新
             session.subscribe("/topic/users.status", new StompFrameHandler() {
@@ -188,8 +226,7 @@ public class WebSocketService {
                                 node.path("sender").asText(),
                                 node.path("message").asText(),
                                 node.path("timestamp").asLong(),
-                                node.path("type").asText("LOBBY_MESSAGE")
-                        );
+                                node.path("type").asText("LOBBY_MESSAGE"));
 
                         if (lobbyMessageHandler != null) {
                             Platform.runLater(() -> lobbyMessageHandler.accept(message));
@@ -260,7 +297,7 @@ public class WebSocketService {
 
         @Override
         public void handleException(StompSession session, StompCommand command,
-                                    StompHeaders headers, byte[] payload, Throwable exception) {
+                StompHeaders headers, byte[] payload, Throwable exception) {
             System.err.println("WebSocket连接错误: " + exception.getMessage());
         }
 
@@ -275,6 +312,13 @@ public class WebSocketService {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    // 添加连接错误处理器
+    private Consumer<String> connectionErrorHandler;
+
+    public void setConnectionErrorHandler(Consumer<String> handler) {
+        this.connectionErrorHandler = handler;
     }
 
     // 添加方法发送消息到大厅
@@ -325,7 +369,6 @@ public class WebSocketService {
         stompSession.send("/app/room.leave", null);
     }
 
-
     // 添加方法发送消息到房间
     public void sendRoomMessage(Long roomId, String message) {
         if (stompSession == null || !stompSession.isConnected()) {
@@ -361,8 +404,7 @@ public class WebSocketService {
                             node.path("sender").asText(),
                             node.path("message").asText(),
                             node.path("timestamp").asLong(),
-                            "ROOM_MESSAGE"
-                    );
+                            "ROOM_MESSAGE");
 
                     if (roomMessageHandler != null) {
                         Platform.runLater(() -> roomMessageHandler.accept(message));
@@ -387,4 +429,3 @@ public class WebSocketService {
     }
 
 }
-

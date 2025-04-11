@@ -7,6 +7,7 @@ module com.client {
     requires spring.websocket;
     requires spring.messaging;
     requires java.sql;
+    requires com.fasterxml.jackson.datatype.jsr310;
 
     exports com.client;
     exports com.client.model;

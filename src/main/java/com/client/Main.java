@@ -38,7 +38,7 @@ public class Main extends Application {
     public static Stage getPrimaryStage() {
         return primaryStage;
     }
-    
+
     // 添加获取线程池的静态方法
     public static ExecutorService getExecutorService() {
         return executorService;
@@ -48,7 +48,7 @@ public class Main extends Application {
     public void stop() {
         // 应用关闭时执行清理操作
         System.out.println("应用关闭中...");
-        
+
         // 关闭线程池
         executorService.shutdown();
         try {
@@ -58,13 +58,14 @@ public class Main extends Application {
         } catch (InterruptedException e) {
             executorService.shutdownNow();
         }
-        
+
         // 尝试获取并关闭WebSocket连接
         Scene scene = primaryStage.getScene();
         if (scene != null && scene.getRoot() instanceof MainView) {
             MainView mainView = (MainView) scene.getRoot();
             try {
-                mainView.disconnect();
+                // 发送退出登录请求
+                mainView.logoutAndDisconnect();
             } catch (Exception e) {
                 System.err.println("关闭WebSocket连接失败: " + e.getMessage());
             }

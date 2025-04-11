@@ -1,5 +1,13 @@
 package com.client.ui;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Timer;
+import java.util.TimerTask;
+
 import com.client.Main;
 import com.client.config.AppConfig;
 import com.client.model.Message;
@@ -8,6 +16,7 @@ import com.client.model.User;
 import com.client.service.ApiService;
 import com.client.service.WebSocketService;
 import com.client.util.AlertUtil;
+
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -16,11 +25,30 @@ import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-
-import java.util.*;
 
 public class MainView extends BorderPane {
 
@@ -55,26 +83,7 @@ public class MainView extends BorderPane {
 
         // 异步连接WebSocket和加载数据
         statusLabel.setText("正在连接到服务器...");
-        new Thread(() -> {
-            try {
-                // 连接WebSocket
-                webSocketService.connect();
-
-                Platform.runLater(() -> {
-                    statusLabel.setText("已连接到服务器");
-                    // 在连接成功后开始定期刷新用户列表
-                    startRefreshTimer();
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    statusLabel.setText("连接服务器失败: " + e.getMessage());
-                    AlertUtil.showError("连接失败", "无法连接到WebSocket服务器: " + e.getMessage());
-                });
-            }
-        }).start();
     }
-
-
 
     private MenuBar createMenuBar() {
         MenuBar menuBar = new MenuBar();
@@ -103,10 +112,10 @@ public class MainView extends BorderPane {
         VBox vbox = new VBox(10);
         vbox.setPadding(new Insets(10));
         vbox.setPrefWidth(200);
-
+    
         Label titleLabel = new Label("在线用户");
         titleLabel.setStyle("-fx-font-weight: bold;");
-
+    
         userListView = new ListView<>(activeUsers);
         userListView.setCellFactory(param -> new ListCell<>() {
             @Override
@@ -124,12 +133,20 @@ public class MainView extends BorderPane {
                 }
             }
         });
-
+    
         Button refreshButton = new Button("刷新");
         refreshButton.setMaxWidth(Double.MAX_VALUE);
         refreshButton.setOnAction(e -> refreshUserList());
-
-        vbox.getChildren().addAll(titleLabel, userListView, refreshButton);
+        
+        // 创建退出按钮
+        Button logoutButton = setupLogoutButton();
+    
+        // 添加分隔
+        Pane spacer = new Pane();
+        spacer.setPrefHeight(10);
+        
+        // 添加所有组件到布局
+        vbox.getChildren().addAll(titleLabel, userListView, refreshButton, spacer, logoutButton);
         return vbox;
     }
 
@@ -155,9 +172,6 @@ public class MainView extends BorderPane {
         return tabPane;
     }
 
-
-    // 修改createLobbyChatView方法
-
     private VBox createLobbyChatView() {
         VBox chatBox = new VBox(10);
         chatBox.setPadding(new Insets(10));
@@ -172,7 +186,7 @@ public class MainView extends BorderPane {
                     setText(null);
                     setStyle("");
                 } else {
-                    // 修改这里的消息显示格式，确保包含时间和用户名
+                    // 消息显示格式，包含时间和用户名
                     setText(String.format("[%s] %s: %s",
                             message.getFormattedTime(), message.getSender(), message.getContent()));
 
@@ -180,7 +194,7 @@ public class MainView extends BorderPane {
                     if (message.getSender().equals("系统")) {
                         setStyle("-fx-text-fill: red;");
                     } else if (message.getSender().equals(currentUser.getUsername())) {
-                        setStyle("-fx-text-fill: black; -fx-font-weight: black;");
+                        setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
                     } else {
                         setStyle("-fx-text-fill: black;");
                     }
@@ -206,9 +220,9 @@ public class MainView extends BorderPane {
             String message = messageField.getText().trim();
             if (!message.isEmpty()) {
                 messageField.clear();
+                // 发送消息到服务器
                 webSocketService.sendLobbyMessage(message);
-
-                // 为用户提供即时反馈，但实际显示应通过WebSocket响应
+                // 简单提供反馈，不在本地添加消息
                 statusLabel.setText("消息已发送");
             }
         };
@@ -219,9 +233,10 @@ public class MainView extends BorderPane {
         // 加载历史消息
         loadLobbyMessages(chatListView);
 
-        // 设置WebSocket消息处理器 - 确保消息正确添加到列表
+        // 设置WebSocket消息处理器，由服务端统一处理和广播
         webSocketService.setLobbyMessageHandler(message -> {
             Platform.runLater(() -> {
+                // 直接添加从WebSocket收到的消息
                 chatListView.getItems().add(message);
                 chatListView.scrollTo(chatListView.getItems().size() - 1);
             });
@@ -308,14 +323,13 @@ public class MainView extends BorderPane {
         profileGrid.add(usernameLabel, 1, 1);
 
         // 客户端地址字段
-        Label clientAddressLabel = new Label(currentUser.getClientAddress() != null ?
-                currentUser.getClientAddress() : "未知");
+        Label clientAddressLabel = new Label(
+                currentUser.getClientAddress() != null ? currentUser.getClientAddress() : "未知");
         profileGrid.add(new Label("客户端地址:"), 0, 2);
         profileGrid.add(clientAddressLabel, 1, 2);
 
         // 虚拟IP字段
-        Label virtualIpLabel = new Label(currentUser.getVirtualIp() != null ?
-                currentUser.getVirtualIp() : "未分配");
+        Label virtualIpLabel = new Label(currentUser.getVirtualIp() != null ? currentUser.getVirtualIp() : "未分配");
         profileGrid.add(new Label("虚拟IP:"), 0, 3);
         profileGrid.add(virtualIpLabel, 1, 3);
 
@@ -339,8 +353,7 @@ public class MainView extends BorderPane {
                             (String) messageData.get("sender"),
                             (String) messageData.get("message"),
                             ((Number) messageData.get("timestamp")).longValue(),
-                            (String) messageData.getOrDefault("type", "LOBBY_MESSAGE")
-                    );
+                            (String) messageData.getOrDefault("type", "LOBBY_MESSAGE"));
                     messages.add(message);
                 }
 
@@ -352,9 +365,7 @@ public class MainView extends BorderPane {
                     }
                 });
             } catch (Exception e) {
-                Platform.runLater(() ->
-                        AlertUtil.showError("错误", "无法加载聊天记录: " + e.getMessage())
-                );
+                Platform.runLater(() -> AlertUtil.showError("错误", "无法加载聊天记录: " + e.getMessage()));
             }
         }).start();
     }
@@ -370,9 +381,7 @@ public class MainView extends BorderPane {
                     statusLabel.setText("房间列表已更新 - 可用房间: " + rooms.size());
                 });
             } catch (Exception e) {
-                Platform.runLater(() ->
-                        statusLabel.setText("无法获取房间列表: " + e.getMessage())
-                );
+                Platform.runLater(() -> statusLabel.setText("无法获取房间列表: " + e.getMessage()));
             }
         }).start();
     }
@@ -448,7 +457,8 @@ public class MainView extends BorderPane {
                             // 显示房间界面
                             Stage primaryStage = (Stage) getScene().getWindow();
                             primaryStage.setTitle("房间: " + userRoom.getName() + " - " + currentUser.getUsername());
-                            primaryStage.getScene().setRoot(new RoomView(userRoom, currentUser, apiService, webSocketService, appConfig, primaryStage));
+                            primaryStage.getScene().setRoot(new RoomView(userRoom, currentUser, apiService,
+                                    webSocketService, appConfig, primaryStage));
                         });
                     }
                 } catch (Exception e) {
@@ -467,7 +477,8 @@ public class MainView extends BorderPane {
                     // 显示房间界面
                     Stage primaryStage = (Stage) getScene().getWindow();
                     primaryStage.setTitle("房间: " + room.getName() + " - " + currentUser.getUsername());
-                    primaryStage.getScene().setRoot(new RoomView(room, currentUser, apiService, webSocketService, appConfig, primaryStage));
+                    primaryStage.getScene().setRoot(
+                            new RoomView(room, currentUser, apiService, webSocketService, appConfig, primaryStage));
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> AlertUtil.showError("加入房间失败", e.getMessage()));
@@ -475,9 +486,9 @@ public class MainView extends BorderPane {
         }).start();
     }
 
-
     // 添加刷新用户信息的方法
-    private void refreshUserInfo(GridPane profileGrid, Label usernameLabel, Label clientAddressLabel, Label virtualIpLabel) {
+    private void refreshUserInfo(GridPane profileGrid, Label usernameLabel, Label clientAddressLabel,
+            Label virtualIpLabel) {
         new Thread(() -> {
             try {
                 User updatedUser = apiService.getCurrentUser();
@@ -487,12 +498,11 @@ public class MainView extends BorderPane {
                         usernameLabel.setText(updatedUser.getUsername());
 
                         // 更新客户端地址
-                        clientAddressLabel.setText(updatedUser.getClientAddress() != null ?
-                                updatedUser.getClientAddress() : "未知");
+                        clientAddressLabel.setText(
+                                updatedUser.getClientAddress() != null ? updatedUser.getClientAddress() : "未知");
 
                         // 更新虚拟IP
-                        virtualIpLabel.setText(updatedUser.getVirtualIp() != null ?
-                                updatedUser.getVirtualIp() : "未分配");
+                        virtualIpLabel.setText(updatedUser.getVirtualIp() != null ? updatedUser.getVirtualIp() : "未分配");
 
                         // 更新当前用户对象
                         currentUser = updatedUser;
@@ -501,9 +511,7 @@ public class MainView extends BorderPane {
                     });
                 }
             } catch (Exception e) {
-                Platform.runLater(() ->
-                        statusLabel.setText("无法获取用户信息: " + e.getMessage())
-                );
+                Platform.runLater(() -> statusLabel.setText("无法获取用户信息: " + e.getMessage()));
             }
         }).start();
     }
@@ -569,9 +577,7 @@ public class MainView extends BorderPane {
                     statusLabel.setText("用户列表已更新 - 在线用户: " + users.size());
                 });
             } catch (Exception e) {
-                Platform.runLater(() ->
-                        statusLabel.setText("无法获取用户列表: " + e.getMessage())
-                );
+                Platform.runLater(() -> statusLabel.setText("无法获取用户列表: " + e.getMessage()));
             }
         }).start();
     }
@@ -603,9 +609,7 @@ public class MainView extends BorderPane {
                         primaryStage.centerOnScreen();
                     });
                 } catch (Exception e) {
-                    Platform.runLater(() ->
-                            AlertUtil.showError("退出失败", e.getMessage())
-                    );
+                    Platform.runLater(() -> AlertUtil.showError("退出失败", e.getMessage()));
                 }
             }).start();
         }
@@ -679,5 +683,48 @@ public class MainView extends BorderPane {
         }
 
         System.out.println("已断开与服务器的连接");
+    }
+
+    // 添加方法处理登出和断开连接
+    public void logoutAndDisconnect() {
+        if (webSocketService != null) {
+            try {
+                // 先发送登出请求
+                webSocketService.logout();
+                // 等待一小段时间确保消息发送
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                // 然后断开连接
+                webSocketService.disconnect();
+            } catch (Exception e) {
+                System.err.println("登出或断开连接失败: " + e.getMessage());
+            }
+        }
+    }
+
+    private Button setupLogoutButton() {
+        Button logoutBtn = new Button("退出登录");
+        logoutBtn.setOnAction(e -> {
+            if (AlertUtil.showConfirmation("退出登录", "确定要退出登录吗？")) {
+                logoutAndDisconnect();
+                // 停止刷新定时器
+                if (refreshTimer != null) {
+                    refreshTimer.cancel();
+                }
+                // 切换回登录界面
+                Stage primaryStage = Main.getPrimaryStage();
+                primaryStage.setTitle("游戏大厅 - 登录");
+                primaryStage.setScene(new Scene(new LoginView(), 400, 300));
+                primaryStage.setResizable(false);
+                primaryStage.centerOnScreen();
+            }
+        });
+        
+        // 设置按钮样式和大小
+        logoutBtn.setMaxWidth(Double.MAX_VALUE);
+        return logoutBtn;
     }
 }
