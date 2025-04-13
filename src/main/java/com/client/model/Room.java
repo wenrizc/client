@@ -6,24 +6,21 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
-@JsonIgnoreProperties(ignoreUnknown = true) // 忽略未知属性
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Room {
     private Long id;
     private String name;
-    private String gameType;
+    private String gameName;
     private int maxPlayers;
-    private Instant creationTime;
     private String creatorUsername;
-    private String status;
-    private String n2nNetworkId;
-    private String n2nNetworkName;
-    private String n2nNetworkSecret;
     private Set<String> players = new HashSet<>();
+    private String status;
+    private Instant creationTime;
+    private String networkId;
+    private String networkName;
+    private String networkType;
 
-    public Room() {
-    }
-
-    // Getters 和 setters
+    // Getters and Setters
     public Long getId() {
         return id;
     }
@@ -40,12 +37,12 @@ public class Room {
         this.name = name;
     }
 
-    public String getGameType() {
-        return gameType;
+    public String getGameName() {
+        return gameName;
     }
 
-    public void setGameType(String gameType) {
-        this.gameType = gameType;
+    public void setGameName(String gameName) {
+        this.gameName = gameName;
     }
 
     public int getMaxPlayers() {
@@ -56,52 +53,12 @@ public class Room {
         this.maxPlayers = maxPlayers;
     }
 
-    public Instant getCreationTime() {
-        return creationTime;
-    }
-
-    public void setCreationTime(Instant creationTime) {
-        this.creationTime = creationTime;
-    }
-
     public String getCreatorUsername() {
         return creatorUsername;
     }
 
     public void setCreatorUsername(String creatorUsername) {
         this.creatorUsername = creatorUsername;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getN2nNetworkId() {
-        return n2nNetworkId;
-    }
-
-    public void setN2nNetworkId(String n2nNetworkId) {
-        this.n2nNetworkId = n2nNetworkId;
-    }
-
-    public String getN2nNetworkName() {
-        return n2nNetworkName;
-    }
-
-    public void setN2nNetworkName(String n2nNetworkName) {
-        this.n2nNetworkName = n2nNetworkName;
-    }
-
-    public String getN2nNetworkSecret() {
-        return n2nNetworkSecret;
-    }
-
-    public void setN2nNetworkSecret(String n2nNetworkSecret) {
-        this.n2nNetworkSecret = n2nNetworkSecret;
     }
 
     public Set<String> getPlayers() {
@@ -112,16 +69,71 @@ public class Room {
         this.players = players;
     }
 
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Instant getCreationTime() {
+        return creationTime;
+    }
+
+    public void setCreationTime(Instant creationTime) {
+        this.creationTime = creationTime;
+    }
+
+    public String getNetworkId() {
+        return networkId;
+    }
+
+    public void setNetworkId(String networkId) {
+        this.networkId = networkId;
+    }
+
+    public String getNetworkName() {
+        return networkName;
+    }
+
+    public void setNetworkName(String networkName) {
+        this.networkName = networkName;
+    }
+
+    public String getNetworkType() {
+        return networkType;
+    }
+
+    public void setNetworkType(String networkType) {
+        this.networkType = networkType;
+    }
+
+    // 便捷方法
     public boolean isFull() {
         return players.size() >= maxPlayers;
     }
 
-    public boolean isCreator(String username) {
-        return creatorUsername != null && creatorUsername.equals(username);
+    public boolean isWaiting() {
+        return "WAITING".equals(status);
+    }
+
+    public boolean isPlaying() {
+        return "PLAYING".equals(status);
+    }
+
+    public int getCurrentPlayers() {
+        return players.size();
     }
 
     @Override
     public String toString() {
-        return name + " [" + players.size() + "/" + maxPlayers + "] - " + gameType;
+        return "Room{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", gameName='" + gameName + '\'' +
+                ", players=" + players.size() + "/" + maxPlayers +
+                ", status='" + status + '\'' +
+                '}';
     }
 }

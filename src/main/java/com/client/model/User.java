@@ -1,25 +1,21 @@
 package com.client.model;
 
-import java.time.Instant;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.time.Instant;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class User {
     private Long id;
     private String username;
-    private String password;
     private String clientAddress;
     private String virtualIp;
-    private String sessionId;
-    private Instant lastActiveTime;
     private boolean active;
+    @JsonProperty("lastActiveTime")
+    private Instant lastActiveTime;
 
-    // 构造函数
-    public User() {
-    }
-
-    // getters和setters
+    // Getters and Setters
     public Long getId() {
         return id;
     }
@@ -34,14 +30,6 @@ public class User {
 
     public void setUsername(String username) {
         this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 
     public String getClientAddress() {
@@ -60,12 +48,12 @@ public class User {
         this.virtualIp = virtualIp;
     }
 
-    public String getSessionId() {
-        return sessionId;
+    public boolean isActive() {
+        return active;
     }
 
-    public void setSessionId(String sessionId) {
-        this.sessionId = sessionId;
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
     public Instant getLastActiveTime() {
@@ -76,11 +64,12 @@ public class User {
         this.lastActiveTime = lastActiveTime;
     }
 
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", username='" + username + '\'' +
+                ", active=" + active +
+                '}';
     }
 }

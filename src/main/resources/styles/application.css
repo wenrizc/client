@@ -1,0 +1,114 @@
+/* 全局样式 */
+.root {
+    -fx-font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    -fx-font-size: 14px;
+    -fx-background-color: #f5f5f5;
+}
+
+/* 标题样式 */
+.title-label {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2196F3;
+}
+
+/* 子标题样式 */
+.section-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 5 0 5 0;
+}
+
+/* 按钮样式 */
+.button-raised {
+    -fx-background-color: #2196F3;
+    -fx-text-fill: white;
+    -fx-padding: 8 15 8 15;
+    -fx-cursor: hand;
+}
+
+.button-raised:hover {
+    -fx-background-color: #1976D2;
+}
+
+.button-flat {
+    -fx-background-color: transparent;
+    -fx-text-fill: #2196F3;
+    -fx-cursor: hand;
+}
+
+.button-flat:hover {
+    -fx-background-color: rgba(33, 150, 243, 0.1);
+}
+
+/* 登录界面样式 */
+.login-pane {
+    -fx-background-color: white;
+}
+
+.version-label {
+    -fx-text-fill: #757575;
+    -fx-font-size: 10px;
+}
+
+/* 大厅界面样式 */
+.lobby-pane {
+    -fx-background-color: white;
+}
+
+.header {
+    -fx-background-color: #2196F3;
+    -fx-padding: 10;
+}
+
+.header-label {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.sidebar {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 1 0 0;
+}
+
+.footer {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1 0 0 0;
+}
+
+/* 表格样式 */
+.table-view {
+    -fx-background-color: white;
+    -fx-table-cell-border-color: transparent;
+}
+
+.table-view .column-header {
+    -fx-background-color: #f5f5f5;
+}
+
+/* 列表样式 */
+.list-view {
+    -fx-background-color: white;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: #bbdefb;
+    -fx-text-fill: black;
+}
+
+/* 标签页样式 */
+.tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: #f5f5f5;
+}
+
+.tab-pane .tab {
+    -fx-background-color: #e0e0e0;
+}
+
+.tab-pane .tab:selected {
+    -fx-background-color: white;
+}
+
