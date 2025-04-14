@@ -112,3 +112,100 @@
     -fx-background-color: white;
 }
 
+/* 添加以下样式到现有CSS文件中 */
+
+/* 连接状态样式 */
+.connected {
+    -fx-text-fill: #4CAF50;
+}
+
+.disconnected {
+    -fx-text-fill: #F44336;
+}
+
+/* 按钮悬停效果 */
+.button-primary:hover {
+    -fx-background-color: #1565C0;
+}
+
+.button-secondary {
+    -fx-background-color: #78909C;
+    -fx-text-fill: white;
+}
+
+.button-secondary:hover {
+    -fx-background-color: #546E7A;
+}
+
+/* 设置对话框样式 */
+.settings-pane {
+    -fx-background-color: white;
+}
+
+.field-label {
+    -fx-font-weight: bold;
+}
+
+.settings-field {
+    -fx-pref-height: 35px;
+}
+
+.status-label {
+    -fx-font-size: 12px;
+}
+
+.error-label {
+    -fx-text-fill: #F44336;
+}
+
+.success-label {
+    -fx-text-fill: #4CAF50;
+}
+
+/* 输入框和图标容器 */
+.input-container {
+    -fx-spacing: 10;
+    -fx-background-color: transparent;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 5 5 5 5;
+}
+
+.input-container .login-field:focused {
+    -fx-border-color: #2196F3;
+}
+
+.field-icon {
+    -fx-fill: #757575;
+    -fx-padding: 0 5 0 0;
+}
+
+/* 设置按钮容器 */
+.settings-button {
+    -fx-cursor: hand;
+}
+
+.settings-button:hover {
+    -fx-background-color: rgba(33, 150, 243, 0.1);
+    -fx-background-radius: 4px;
+}
+
+.settings-icon {
+    -fx-fill: #757575;
+}
+
+.details-label {
+    -fx-font-size: 12px;
+    -fx-padding: 5px 0 0 0;
+    -fx-text-fill: #555555;
+}
+
+.success-label {
+    -fx-text-fill: #2e7d32;
+    -fx-font-weight: bold;
+}
+
+.error-label {
+    -fx-text-fill: #c62828;
+    -fx-font-weight: bold;
+}

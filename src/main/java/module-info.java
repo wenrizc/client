@@ -27,6 +27,9 @@ module com.client {
     requires reactor.core;
     requires jakarta.annotation;
     requires java.prefs;
+    requires de.jensd.fx.glyphs.commons;
+    requires de.jensd.fx.glyphs.materialicons;
+
 
     // 向Spring框架开放所有需要的包
     opens com.client to javafx.fxml, spring.beans, spring.context, spring.core;
@@ -38,6 +41,7 @@ module com.client {
     opens com.client.util to spring.beans, spring.context, spring.core;
     opens com.client.model to spring.beans, spring.context, spring.core, com.fasterxml.jackson.databind;
     opens com.client.network to spring.beans, spring.context, spring.core;
+
 
     // 资源文件夹开放
     opens fxml;

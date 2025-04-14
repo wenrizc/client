@@ -1,5 +1,7 @@
 package com.client.config;
 
+import com.client.controller.BaseController;
+import com.client.controller.ServerSettingsController;
 import com.client.util.ResourceUtil;
 import com.client.view.FxmlView;
 import javafx.fxml.FXMLLoader;
@@ -111,9 +113,12 @@ public class StageManager {
 
     private Parent loadViewNodeFromFxml(FxmlView view) throws IOException {
         try {
-            String fxmlPath = appProperties.getFxmlPath() + view.getFxmlFile();
-            FXMLLoader loader = new FXMLLoader();
-            loader.setLocation(new ClassPathResource(fxmlPath).getURL());
+            URL fxmlUrl = resourceUtil.getFxmlResource(view.getFxmlFile());
+            if (fxmlUrl == null) {
+                throw new IOException("无法找到FXML文件: " + view.getFxmlFile());
+            }
+
+            FXMLLoader loader = new FXMLLoader(fxmlUrl);
             loader.setControllerFactory(applicationContext::getBean);
             return loader.load();
         } catch (IOException e) {
@@ -125,4 +130,51 @@ public class StageManager {
     public void clearSceneCache() {
         sceneCache.clear();
     }
+
+    public <T extends BaseController> T openDialog(FxmlView view) {
+        try {
+            URL fxmlUrl = resourceUtil.getFxmlResource(view.getFxmlFile());
+            if (fxmlUrl == null) {
+                logger.error("无法找到FXML资源: {}", view.getFxmlFile());
+                throw new IOException("无法找到FXML文件: " + view.getFxmlFile());
+            }
+
+            FXMLLoader loader = new FXMLLoader(fxmlUrl);
+            loader.setControllerFactory(applicationContext::getBean);
+
+            Parent root = loader.load();
+            Scene scene = new Scene(root);
+
+            // 加载CSS
+            String cssFileName = "application.css";
+            String cssUrl = resourceUtil.getCssUrl(cssFileName);
+            if (cssUrl != null) {
+                scene.getStylesheets().add(cssUrl);
+                logger.debug("成功加载CSS: {}", cssFileName);
+            }
+
+            Stage dialogStage = new Stage();
+            dialogStage.setTitle(view.getTitle());
+            dialogStage.initModality(Modality.APPLICATION_MODAL);
+            dialogStage.initOwner(primaryStage);
+            dialogStage.setScene(scene);
+
+            // 获取控制器实例
+            T controller = loader.getController();
+
+            // 如果控制器支持设置对话框Stage
+            if (controller instanceof ServerSettingsController) {
+                ((ServerSettingsController) controller).setDialogStage(dialogStage);
+            }
+
+            dialogStage.showAndWait();
+
+            return controller;
+
+        } catch (Exception e) {
+            logger.error("显示对话框失败: " + view.getFxmlFile(), e);
+            throw new RuntimeException("无法加载对话框", e);
+        }
+    }
+
 }

@@ -65,11 +65,36 @@ public class ResourceUtil {
         }
     }
 
-    public InputStream getResourceStream(String resourcePath) {
+    public URL getFxmlResource(String fxmlFileName) {
+        String fxmlPath = appProperties.getFxmlPath() + fxmlFileName;
+        logger.debug("尝试加载FXML文件: {}", fxmlPath);
+
         try {
-            return new ClassPathResource(resourcePath).getInputStream();
+            ClassPathResource resource = new ClassPathResource(fxmlPath);
+            if (resource.exists()) {
+                logger.debug("通过标准路径成功加载FXML: {}", fxmlPath);
+                return resource.getURL();
+            }
+
+            resource = new ClassPathResource(fxmlFileName);
+            if (resource.exists()) {
+                logger.debug("直接使用文件名加载FXML成功: {}", fxmlFileName);
+                return resource.getURL();
+            }
+
+            if (fxmlFileName.startsWith("/")) {
+                String path = fxmlFileName.substring(1);
+                resource = new ClassPathResource(path);
+                if (resource.exists()) {
+                    logger.debug("移除前导斜杠后加载FXML成功: {}", path);
+                    return resource.getURL();
+                }
+            }
+
+            logger.warn("无法找到FXML文件: {}", fxmlPath);
+            return null;
         } catch (IOException e) {
-            logger.error("获取资源流失败: " + resourcePath, e);
+            logger.error("加载FXML资源失败: {}", e.getMessage());
             return null;
         }
     }

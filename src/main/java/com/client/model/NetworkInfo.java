@@ -1,19 +1,27 @@
 package com.client.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
-@JsonIgnoreProperties(ignoreUnknown = true)
+/**
+ * 网络信息模型
+ */
 public class NetworkInfo {
+    private String username;
     private String virtualIp;
+    private boolean inRoom;
+    private Long roomId;
+    private String roomName;
     private String networkId;
     private String networkName;
-    private String networkSecret;
     private String networkType;
-    private String superNodeIp;
-    private int superNodePort;
 
     public NetworkInfo() {
-        // 默认构造函数
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getVirtualIp() {
@@ -22,6 +30,30 @@ public class NetworkInfo {
 
     public void setVirtualIp(String virtualIp) {
         this.virtualIp = virtualIp;
+    }
+
+    public boolean isInRoom() {
+        return inRoom;
+    }
+
+    public void setInRoom(boolean inRoom) {
+        this.inRoom = inRoom;
+    }
+
+    public Long getRoomId() {
+        return roomId;
+    }
+
+    public void setRoomId(Long roomId) {
+        this.roomId = roomId;
+    }
+
+    public String getRoomName() {
+        return roomName;
+    }
+
+    public void setRoomName(String roomName) {
+        this.roomName = roomName;
     }
 
     public String getNetworkId() {
@@ -40,14 +72,6 @@ public class NetworkInfo {
         this.networkName = networkName;
     }
 
-    public String getNetworkSecret() {
-        return networkSecret;
-    }
-
-    public void setNetworkSecret(String networkSecret) {
-        this.networkSecret = networkSecret;
-    }
-
     public String getNetworkType() {
         return networkType;
     }
@@ -56,31 +80,17 @@ public class NetworkInfo {
         this.networkType = networkType;
     }
 
-    public String getSuperNodeIp() {
-        return superNodeIp;
-    }
-
-    public void setSuperNodeIp(String superNodeIp) {
-        this.superNodeIp = superNodeIp;
-    }
-
-    public int getSuperNodePort() {
-        return superNodePort;
-    }
-
-    public void setSuperNodePort(int superNodePort) {
-        this.superNodePort = superNodePort;
-    }
-
     @Override
     public String toString() {
         return "NetworkInfo{" +
-                "virtualIp='" + virtualIp + '\'' +
+                "username='" + username + '\'' +
+                ", virtualIp='" + virtualIp + '\'' +
+                ", inRoom=" + inRoom +
+                ", roomId=" + roomId +
+                ", roomName='" + roomName + '\'' +
                 ", networkId='" + networkId + '\'' +
                 ", networkName='" + networkName + '\'' +
                 ", networkType='" + networkType + '\'' +
-                ", superNodeIp='" + superNodeIp + '\'' +
-                ", superNodePort=" + superNodePort +
                 '}';
     }
 }
