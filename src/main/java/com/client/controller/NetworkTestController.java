@@ -1,6 +1,7 @@
 package com.client.controller;
 
 import com.client.service.NetworkTestService;
+import com.client.util.NetworkTestLogger;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -12,9 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
 /**
  * 网络测试控制器 - 提供用户界面来执行网络测试
  */
@@ -23,7 +21,6 @@ import java.time.format.DateTimeFormatter;
 public class NetworkTestController {
 
     private static final Logger logger = LoggerFactory.getLogger(NetworkTestController.class);
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     @FXML private Button runHttpTestButton;
     @FXML private Button runWsTestButton;
@@ -45,6 +42,9 @@ public class NetworkTestController {
             resultsTextArea.setScrollTop(Double.MAX_VALUE);
         });
 
+        // 设置日志回调，将日志输出到UI
+        NetworkTestLogger.setLogCallback(this::appendToTextArea);
+
         logMessage("网络测试工具已加载");
     }
 
@@ -56,9 +56,7 @@ public class NetworkTestController {
         // 创建单独的线程运行测试，避免阻塞UI
         new Thread(() -> {
             try {
-                // 这里应该调用网络测试服务的HTTP测试方法
-                // 为简化示例，这里直接调用完整测试
-                networkTestService.runNetworkTests();
+                networkTestService.runHttpTests();
             } catch (Exception e) {
                 logError("HTTP测试出错: " + e.getMessage());
             } finally {
@@ -74,9 +72,7 @@ public class NetworkTestController {
 
         new Thread(() -> {
             try {
-                // 这里应该调用网络测试服务的WebSocket测试方法
-                // 为简化示例，这里直接调用完整测试
-                networkTestService.runNetworkTests();
+                networkTestService.runWebSocketTests();
             } catch (Exception e) {
                 logError("WebSocket测试出错: " + e.getMessage());
             } finally {
@@ -103,16 +99,16 @@ public class NetworkTestController {
     }
 
     private void logMessage(String message) {
-        Platform.runLater(() -> {
-            String timestamp = LocalDateTime.now().format(formatter);
-            resultsTextArea.appendText("[" + timestamp + "] " + message + "\n");
-        });
+        appendToTextArea(message);
     }
 
     private void logError(String message) {
+        appendToTextArea("错误: " + message);
+    }
+
+    private void appendToTextArea(String message) {
         Platform.runLater(() -> {
-            String timestamp = LocalDateTime.now().format(formatter);
-            resultsTextArea.appendText("[" + timestamp + "] 错误: " + message + "\n");
+            resultsTextArea.appendText(message + "\n");
         });
     }
 }

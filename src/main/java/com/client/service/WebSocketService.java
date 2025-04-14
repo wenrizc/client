@@ -1,5 +1,35 @@
 package com.client.service;
 
+import java.lang.reflect.Type;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompFrameHandler;
+import org.springframework.messaging.simp.stomp.StompHeaders;
+import org.springframework.messaging.simp.stomp.StompSession;
+import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.stereotype.Service;
+import org.springframework.web.socket.messaging.WebSocketStompClient;
+
 import com.client.config.AppProperties;
 import com.client.model.Message;
 import com.client.model.Room;
@@ -7,66 +37,53 @@ import com.client.network.ConnectionState;
 import com.client.session.ConnectionFailedEvent;
 import com.client.session.ReconnectSuccessEvent;
 import com.client.session.SessionManager;
-import jakarta.annotation.PreDestroy;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.messaging.simp.stomp.*;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.stereotype.Service;
-import org.springframework.web.socket.messaging.WebSocketStompClient;
 
-import java.lang.reflect.Type;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
+import jakarta.annotation.PreDestroy;
 
 @Service
 public class WebSocketService {
-
     private static final Logger logger = LoggerFactory.getLogger(WebSocketService.class);
-    private static final int RECONNECT_DELAY_MS = 3000;
-    private static final int MAX_RECONNECT_ATTEMPTS = 5;
-    private static final int CONNECT_TIMEOUT_SECONDS = 10;
 
+    // 连接相关配置
+    private static final int CONNECT_TIMEOUT_SECONDS = 10;
+    private static final int MAX_RECONNECT_ATTEMPTS = 5;
+    private static final long INITIAL_RECONNECT_DELAY_MS = 1000;
+    private static final long MAX_RECONNECT_DELAY_MS = 30000;
+
+    // 心跳相关配置
+    private static final long HEARTBEAT_INTERVAL_MS = 10000;  // 10秒，与STOMP配置保持一致
+    private static final long HEARTBEAT_TIMEOUT_MS = 30000;   // 30秒，更合理的超时时间
+
+    // 连接健康检查
+    private static final long HEALTH_CHECK_INTERVAL_MS = 60000; // 1分钟检查一次连接健康状况
+
+    // 依赖注入
     private final SessionManager sessionManager;
     private final WebSocketStompClient stompClient;
     private final AppProperties appProperties;
     private final TaskScheduler taskScheduler;
 
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
+    // 状态变量
     private volatile StompSession stompSession;
     private final ConcurrentHashMap<String, SubscriptionEntry<?>> subscriptions = new ConcurrentHashMap<>();
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private final AtomicBoolean reconnecting = new AtomicBoolean(false);
-    private final Object reconnectLock = new Object(); // 新增重连锁
-
-    // 重连相关配置
-    private static final long INITIAL_RECONNECT_DELAY_MS = 1000; // 首次重连延迟增加到1秒
-    private static final long MAX_RECONNECT_DELAY_MS = 30000; // 最长等待30秒
-
-    // 心跳相关配置
-    private static final long HEARTBEAT_INTERVAL_MS = 4000; // 4秒发送一次心跳
-    private static final long HEARTBEAT_TIMEOUT_MS = 15000;  // 增加到10秒超时，提高容错性
-
-    @Autowired
-    private ApplicationEventPublisher eventPublisher;
-
+    private final ReentrantLock reconnectLock = new ReentrantLock();
     private final AtomicReference<ConnectionState> connectionState = new AtomicReference<>(ConnectionState.DISCONNECTED);
     private final AtomicReference<Instant> lastHeartbeatResponse = new AtomicReference<>(Instant.now());
     private volatile ScheduledFuture<?> heartbeatTask;
     private volatile ScheduledFuture<?> heartbeatCheckTask;
+    private volatile ScheduledFuture<?> healthCheckTask;
     private String lastUsername;
     private String lastPassword;
+    private String lastErrorMessage = "";
     private boolean autoReconnect = true;
-    private final AtomicBoolean cleanDisconnectInProgress = new AtomicBoolean(false); // 新增清理标记
+    private final AtomicBoolean cleanDisconnectInProgress = new AtomicBoolean(false);
+    private final AtomicInteger heartbeatFailures = new AtomicInteger(0);
+    private final AtomicInteger consecutiveHeartbeatSuccesses = new AtomicInteger(0);
 
     @Autowired
     public WebSocketService(SessionManager sessionManager, WebSocketStompClient stompClient,
@@ -76,48 +93,32 @@ public class WebSocketService {
         this.appProperties = appProperties;
         this.taskScheduler = taskScheduler;
 
-        // 使用JavaFX属性绑定监听会话状态变化
         this.sessionManager.sessionIdProperty().addListener((observable, oldValue, newValue) -> {
-            if (newValue != null && !newValue.isEmpty()) {
-                connect();
-            } else {
-                cleanDisconnect();
-            }
+            if (newValue != null && !newValue.isEmpty()) connect();
+            else cleanDisconnect();
         });
 
-        // 初始检查连接状态
         if (sessionManager.getSessionId() != null && !sessionManager.getSessionId().isEmpty()) {
             connect();
         }
     }
 
-    /**
-     * 获取当前连接状态
-     */
     public ConnectionState getConnectionState() {
         if (stompSession != null && stompSession.isConnected()) {
             return connectionState.get();
         } else if (reconnecting.get()) {
-            return ConnectionState.CONNECTING;
+            return ConnectionState.RECONNECTING;
         } else {
             return ConnectionState.DISCONNECTED;
         }
     }
 
     /**
-     * 连接到WebSocket服务器
+     * 建立WebSocket连接
      */
     public synchronized boolean connect() {
-        if (isConnected()) {
-            logger.debug("WebSocket已连接");
-            return true;
-        }
-
-        if (reconnecting.get()) {
-            logger.debug("重连正在进行中，跳过连接请求");
-            return false;
-        }
-
+        if (isConnected()) return true;
+        if (reconnecting.get()) return false;
         if (!sessionManager.hasValidSession()) {
             logger.warn("未登录，无法连接WebSocket");
             return false;
@@ -130,63 +131,48 @@ public class WebSocketService {
         }
 
         try {
-            // 标记为正在重连，防止并发连接
             reconnecting.set(true);
             connectionState.set(ConnectionState.CONNECTING);
 
-            // 使用http/https协议而非ws/wss
             String wsUrl = appProperties.getWsServerUrl();
-            // 确保URL使用http/https协议
-            if (wsUrl.startsWith("ws://")) {
-                wsUrl = "http://" + wsUrl.substring(5);
-            } else if (wsUrl.startsWith("wss://")) {
-                wsUrl = "https://" + wsUrl.substring(6);
-            }
+            if (wsUrl.startsWith("ws://")) wsUrl = "http://" + wsUrl.substring(5);
+            else if (wsUrl.startsWith("wss://")) wsUrl = "https://" + wsUrl.substring(6);
 
-            // 构建URL并附加会话ID
             wsUrl = wsUrl + "?sessionId=" + sessionId;
             logger.info("连接WebSocket: {}", wsUrl);
 
-            // 配置心跳
-            stompClient.setDefaultHeartbeat(new long[]{10000, 10000});
-
-            // 尝试连接
+            stompClient.setDefaultHeartbeat(new long[] { HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS });
             stompSession = stompClient.connect(wsUrl, new ClientSessionHandler())
                     .get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
-            // 重置重连计数和状态
             reconnectAttempts.set(0);
             reconnecting.set(false);
             cleanDisconnectInProgress.set(false);
             connectionState.set(ConnectionState.CONNECTED);
+            heartbeatFailures.set(0);
+            consecutiveHeartbeatSuccesses.set(0);
 
-            // 重新订阅
             resubscribeAll();
-
-            // 发送连接消息
             sendConnectMessage();
-
-            // 订阅心跳响应
             subscribeToHeartbeatResponses();
-
-            // 启动心跳机制
             startHeartbeat();
+            startHealthCheck();
 
             logger.info("WebSocket连接成功");
             return true;
         } catch (InterruptedException e) {
+            lastErrorMessage = e.getMessage();
             Thread.currentThread().interrupt();
-            connectionState.set(ConnectionState.DISCONNECTED);
-            logger.error("WebSocket连接被中断: {}", e.getMessage());
-            scheduleReconnect();
+            handleConnectionFailure("WebSocket连接被中断: " + e.getMessage());
             return false;
         } catch (ExecutionException | TimeoutException e) {
-            connectionState.set(ConnectionState.DISCONNECTED);
-            logger.error("WebSocket连接失败: {}", e.getMessage());
-            scheduleReconnect();
+            lastErrorMessage = e.getMessage();
+            handleConnectionFailure("WebSocket连接失败: " + e.getMessage());
             return false;
         } finally {
-            reconnecting.set(false);
+            if (!isConnected()) {
+                reconnecting.set(false);
+            }
         }
     }
 
@@ -195,21 +181,15 @@ public class WebSocketService {
      */
     @PreDestroy
     public synchronized void disconnect() {
-        if (!isConnected()) {
-            logger.debug("WebSocket未连接，无需断开");
-            return;
-        }
-
-        // 停止心跳
         stopHeartbeat();
-
+        stopHealthCheck();
         try {
             if (stompSession != null && stompSession.isConnected()) {
                 stompSession.disconnect();
                 logger.info("WebSocket已断开连接");
             }
         } catch (Exception e) {
-            logger.error("断开WebSocket连接时出错: {}", e.getMessage(), e);
+            logger.error("断开WebSocket连接时出错: {}", e.getMessage());
         } finally {
             stompSession = null;
             connectionState.set(ConnectionState.DISCONNECTED);
@@ -217,60 +197,39 @@ public class WebSocketService {
     }
 
     /**
-     * 清理断开连接 - 不触发重连
+     * 清理断开连接（不自动重连）
      */
     public synchronized void cleanDisconnect() {
         if (cleanDisconnectInProgress.compareAndSet(false, true)) {
             try {
-                // 停止自动重连和心跳
                 autoReconnect = false;
                 stopHeartbeat();
-
-                // 取消所有待处理的重连任务
+                stopHealthCheck();
                 reconnecting.set(false);
                 reconnectAttempts.set(0);
 
-                // 断开连接
-                if (stompSession != null) {
+                if (stompSession != null && stompSession.isConnected()) {
                     try {
-                        if (stompSession.isConnected()) {
-                            stompSession.disconnect();
-                        }
+                        stompSession.disconnect();
                     } catch (Exception e) {
                         logger.warn("清理断开连接时出现异常: {}", e.getMessage());
-                    } finally {
-                        stompSession = null;
                     }
+                    stompSession = null;
                 }
 
-                // 更新状态
                 connectionState.set(ConnectionState.DISCONNECTED);
-                logger.info("已执行清理断开连接");
             } finally {
                 cleanDisconnectInProgress.set(false);
-                // 恢复自动重连设置，为下次连接做准备
                 autoReconnect = true;
             }
-        } else {
-            logger.debug("清理断开连接已在进行中");
         }
     }
 
     /**
-     * 订阅指定目的地的消息
-     *
-     * @param <T> 消息载荷类型
-     * @param destination 目的地
-     * @param payloadType 载荷类型
-     * @param messageHandler 消息处理器
+     * 订阅主题
      */
     public <T> void subscribe(String destination, Class<T> payloadType, Consumer<T> messageHandler) {
-        logger.debug("订阅: {}", destination);
-
-        // 存储订阅信息
         subscriptions.put(destination, new SubscriptionEntry<>(payloadType, messageHandler));
-
-        // 如果已连接，立即订阅
         if (isConnected()) {
             try {
                 doSubscribe(destination, payloadType, messageHandler);
@@ -281,98 +240,7 @@ public class WebSocketService {
     }
 
     /**
-     * 执行实际订阅操作
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private <T> void doSubscribe(String destination, Class<T> payloadType, Consumer<T> messageHandler) {
-        if (stompSession == null || !stompSession.isConnected()) {
-            logger.warn("尝试订阅 {} 但STOMP会话未连接", destination);
-            return;
-        }
-
-        try {
-            stompSession.subscribe(destination, new StompFrameHandler() {
-                @Override
-                public Type getPayloadType(StompHeaders headers) {
-                    return payloadType;
-                }
-
-                @Override
-                public void handleFrame(StompHeaders headers, Object payload) {
-                    try {
-                        messageHandler.accept((T) payload);
-                    } catch (Exception e) {
-                        logger.error("处理消息时出错: {}", e.getMessage());
-                    }
-                }
-            });
-        } catch (Exception e) {
-            logger.error("订阅 {} 时发生异常: {}", destination, e.getMessage());
-            // 连接可能已断开，触发重连逻辑
-            handleDisconnect();
-        }
-    }
-
-    /**
-     * 重新订阅所有主题
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private void resubscribeAll() {
-        if (!isConnected() || subscriptions.isEmpty()) {
-            return;
-        }
-
-        logger.info("重新订阅 {} 个主题", subscriptions.size());
-        int successCount = 0;
-
-        for (Map.Entry<String, SubscriptionEntry<?>> entry : subscriptions.entrySet()) {
-            String destination = entry.getKey();
-            SubscriptionEntry<?> subscription = entry.getValue();
-
-            try {
-                stompSession.subscribe(destination, new StompFrameHandler() {
-                    @Override
-                    public Type getPayloadType(StompHeaders headers) {
-                        return subscription.getType();
-                    }
-
-                    @Override
-                    public void handleFrame(StompHeaders headers, Object payload) {
-                        try {
-                            ((Consumer) subscription.getHandler()).accept(payload);
-                        } catch (Exception e) {
-                            logger.error("处理消息时出错: {}", e.getMessage());
-                        }
-                    }
-                });
-                logger.debug("重新订阅成功: {}", destination);
-                successCount++;
-            } catch (Exception e) {
-                logger.error("重新订阅 {} 失败: {}", destination, e.getMessage());
-            }
-        }
-
-        logger.info("成功重新订阅 {}/{} 个主题", successCount, subscriptions.size());
-    }
-
-    /**
-     * 发送连接消息
-     */
-    private void sendConnectMessage() {
-        if (!isConnected() || sessionManager.getCurrentUser() == null) {
-            return;
-        }
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("type", "CONNECT");
-        payload.put("username", sessionManager.getCurrentUser().getUsername());
-        payload.put("timestamp", System.currentTimeMillis());
-
-        send("/app/user.connect", payload);
-    }
-
-    /**
-     * 发送消息到指定目的地
+     * 发送消息
      */
     public void send(String destination, Object payload) {
         if (!isConnected()) {
@@ -384,20 +252,19 @@ public class WebSocketService {
             stompSession.send(destination, payload);
         } catch (Exception e) {
             logger.error("发送消息到 {} 失败: {}", destination, e.getMessage());
-            handleDisconnect(); // 触发重连逻辑
+            handleDisconnect();
         }
     }
 
     /**
-     * 检查是否已连接
+     * 检查是否连接
      */
     public boolean isConnected() {
         return stompSession != null && stompSession.isConnected() &&
                 connectionState.get() == ConnectionState.CONNECTED;
     }
 
-    // 常用订阅方法
-
+    // 订阅方法
     public void subscribeLobbyMessages(Consumer<Message> messageHandler) {
         subscribe("/topic/lobby.messages", Message.class, messageHandler);
     }
@@ -430,8 +297,7 @@ public class WebSocketService {
         subscribe("/topic/system.notifications", Map.class, notificationHandler);
     }
 
-    // 常用发送方法
-
+    // 发送方法
     public void sendCreateRoom(String roomName, String gameName, int maxPlayers) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("roomName", roomName);
@@ -476,80 +342,57 @@ public class WebSocketService {
     }
 
     /**
-     * 发送心跳消息到服务器
+     * 发送心跳消息
      */
     public void sendHeartbeat() {
-        if (!isConnected()) {
-            logger.warn("尝试发送心跳但WebSocket未连接");
-            return;
-        }
+        if (!isConnected()) return;
 
         try {
             Map<String, Object> heartbeatMessage = new HashMap<>();
             heartbeatMessage.put("timestamp", System.currentTimeMillis());
-
             send("/app/user.heartbeat", heartbeatMessage);
-            logger.debug("心跳消息已发送");
         } catch (Exception e) {
-            logger.error("发送心跳消息失败: {}", e.getMessage());
-            // 如果发送失败，可能是连接已断开，触发重连逻辑
-            handleDisconnect();
+            logger.warn("发送心跳失败: {}", e.getMessage());
+            heartbeatFailures.incrementAndGet();
+            updateConnectionStateBasedOnHealth();
+            if (heartbeatFailures.get() > 3) { // 连续3次心跳失败则主动断开
+                handleDisconnect();
+            }
         }
-    }
-
-    /**
-     * 订阅心跳响应消息
-     */
-    private void subscribeToHeartbeatResponses() {
-        if (!isConnected()) {
-            logger.warn("尝试订阅心跳响应但WebSocket未连接");
-            return;
-        }
-
-        subscribe("/user/queue/heartbeat", Map.class, this::processHeartbeatResponse);
-        logger.debug("已订阅心跳响应队列");
-    }
-
-    /**
-     * 处理从服务器接收的心跳响应
-     */
-    private void processHeartbeatResponse(Map<String, Object> payload) {
-        handleHeartbeatResponse();
-        logger.debug("收到心跳响应: {}", payload);
     }
 
     /**
      * 启动心跳机制
      */
     public void startHeartbeat() {
-        stopHeartbeat(); // 先停止现有心跳任务，避免重复
-
-        // 设置最后一次心跳响应时间为当前时间
+        stopHeartbeat();
         lastHeartbeatResponse.set(Instant.now());
 
-        // 定期发送心跳
         heartbeatTask = taskScheduler.scheduleWithFixedDelay(() -> {
-            if (isConnected()) {
-                sendHeartbeat();
+            try {
+                if (isConnected()) sendHeartbeat();
+            } catch (Exception e) {
+                logger.error("心跳任务异常: {}", e.getMessage());
+                heartbeatFailures.incrementAndGet();
+                updateConnectionStateBasedOnHealth();
             }
         }, HEARTBEAT_INTERVAL_MS);
 
-        // 检查心跳响应
         heartbeatCheckTask = taskScheduler.scheduleWithFixedDelay(() -> {
-            if (isConnected() &&
-                    Duration.between(lastHeartbeatResponse.get(), Instant.now()).toMillis() >
-                            HEARTBEAT_TIMEOUT_MS + HEARTBEAT_INTERVAL_MS) {
-
-                logger.warn("心跳超时，标记连接为不健康");
-                connectionState.set(ConnectionState.UNHEALTHY);
-
-                // 断开连接并重连，但不再这里直接调用disconnect
-                // 而是通过handleDisconnect方法来处理，确保状态一致
-                handleDisconnect();
+            try {
+                if (isConnected() && Duration.between(lastHeartbeatResponse.get(), Instant.now()).toMillis()
+                        > HEARTBEAT_TIMEOUT_MS) {
+                    logger.warn("心跳超时，标记连接为不健康");
+                    connectionState.set(ConnectionState.UNHEALTHY);
+                    heartbeatFailures.incrementAndGet();
+                    if (heartbeatFailures.get() > 3) { // 连续3次心跳失败则主动断开
+                        handleDisconnect();
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("心跳检查任务异常: {}", e.getMessage());
             }
         }, HEARTBEAT_INTERVAL_MS);
-
-        logger.info("心跳机制已启动");
     }
 
     /**
@@ -560,7 +403,6 @@ public class WebSocketService {
             heartbeatTask.cancel(true);
             heartbeatTask = null;
         }
-
         if (heartbeatCheckTask != null) {
             heartbeatCheckTask.cancel(true);
             heartbeatCheckTask = null;
@@ -568,14 +410,84 @@ public class WebSocketService {
     }
 
     /**
-     * 设置自动重连功能
+     * 启动健康检查
+     */
+    public void startHealthCheck() {
+        stopHealthCheck();
+
+        healthCheckTask = taskScheduler.scheduleWithFixedDelay(() -> {
+            try {
+                if (isConnected()) {
+                    checkConnectionHealth();
+                }
+            } catch (Exception e) {
+                logger.error("健康检查任务异常: {}", e.getMessage());
+            }
+        }, HEALTH_CHECK_INTERVAL_MS);
+    }
+
+    /**
+     * 停止健康检查
+     */
+    public void stopHealthCheck() {
+        if (healthCheckTask != null) {
+            healthCheckTask.cancel(true);
+            healthCheckTask = null;
+        }
+    }
+
+    /**
+     * 检查连接健康状态
+     */
+    private void checkConnectionHealth() {
+        // 检查最近心跳响应时间
+        long timeSinceLastHeartbeat = Duration.between(lastHeartbeatResponse.get(), Instant.now()).toMillis();
+
+        // 更新连接状态
+        updateConnectionStateBasedOnHealth();
+
+        // 主动测试连接 - 发送额外心跳
+        if (timeSinceLastHeartbeat > HEARTBEAT_INTERVAL_MS * 2) {
+            logger.info("执行主动连接健康检查 - 发送额外心跳");
+            sendHeartbeat();
+        }
+
+        logger.debug("连接健康检查 - 状态: {}, 最近心跳响应: {}ms前",
+                connectionState.get(),
+                timeSinceLastHeartbeat);
+    }
+
+    /**
+     * 根据心跳健康状况更新连接状态
+     */
+    private void updateConnectionStateBasedOnHealth() {
+        int failures = heartbeatFailures.get();
+        int successes = consecutiveHeartbeatSuccesses.get();
+
+        // 只有当连接处于CONNECTED或UNHEALTHY状态时才更新
+        ConnectionState currentState = connectionState.get();
+        if (currentState != ConnectionState.CONNECTED && currentState != ConnectionState.UNHEALTHY) {
+            return;
+        }
+
+        if (failures > 3) {
+            connectionState.set(ConnectionState.UNHEALTHY);
+        } else if (failures > 0) {
+            connectionState.set(ConnectionState.UNHEALTHY);
+        } else if (successes > 0) {
+            connectionState.set(ConnectionState.CONNECTED);
+        }
+    }
+
+    /**
+     * 设置自动重连
      */
     public void setAutoReconnect(boolean autoReconnect) {
         this.autoReconnect = autoReconnect;
     }
 
     /**
-     * 保存登录凭据用于自动重连
+     * 设置登录凭证
      */
     public void setLoginCredentials(String username, String password) {
         this.lastUsername = username;
@@ -586,24 +498,18 @@ public class WebSocketService {
      * 处理连接断开
      */
     public void handleDisconnect() {
-        // 避免重复处理
         if (connectionState.get() == ConnectionState.DISCONNECTED ||
                 connectionState.get() == ConnectionState.CONNECTING) {
             return;
         }
 
-        // 标记连接状态
         connectionState.set(ConnectionState.DISCONNECTED);
-
-        // 停止心跳
         stopHeartbeat();
+        stopHealthCheck();
 
-        // 安全地清理stompSession
         if (stompSession != null) {
             try {
-                if (stompSession.isConnected()) {
-                    stompSession.disconnect();
-                }
+                if (stompSession.isConnected()) stompSession.disconnect();
             } catch (Exception e) {
                 logger.debug("清理STOMP会话时出现异常: {}", e.getMessage());
             } finally {
@@ -611,18 +517,13 @@ public class WebSocketService {
             }
         }
 
-        // 如果启用了自动重连且有有效会话，尝试重连
         if (autoReconnect && sessionManager.hasValidSession()) {
-            logger.info("检测到连接断开，准备重连...");
-            synchronized (reconnectLock) {
-                if (!reconnecting.get()) {
-                    scheduleReconnect();
-                } else {
-                    logger.debug("重连已在计划中，跳过额外重连请求");
-                }
+            reconnectLock.lock();
+            try {
+                if (!reconnecting.get()) scheduleReconnect();
+            } finally {
+                reconnectLock.unlock();
             }
-        } else {
-            logger.info("连接已断开，未启用自动重连或无有效会话");
         }
     }
 
@@ -633,73 +534,162 @@ public class WebSocketService {
         lastHeartbeatResponse.set(Instant.now());
         if (connectionState.get() == ConnectionState.UNHEALTHY) {
             connectionState.set(ConnectionState.CONNECTED);
-            logger.info("心跳恢复，连接已恢复健康状态");
         }
+        heartbeatFailures.set(0);
+        consecutiveHeartbeatSuccesses.incrementAndGet();
+        updateConnectionStateBasedOnHealth();
     }
 
     /**
-     * 安排重连任务，使用指数退避策略
+     * 获取上次错误消息
+     */
+    public String getLastErrorMessage() {
+        return lastErrorMessage;
+    }
+
+    // 私有辅助方法
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private <T> void doSubscribe(String destination, Class<T> payloadType, Consumer<T> messageHandler) {
+        if (stompSession == null || !stompSession.isConnected()) return;
+
+        try {
+            stompSession.subscribe(destination, new StompFrameHandler() {
+                @Override
+                public Type getPayloadType(StompHeaders headers) {
+                    return payloadType;
+                }
+
+                @Override
+                public void handleFrame(StompHeaders headers, Object payload) {
+                    try {
+                        messageHandler.accept((T) payload);
+                    } catch (Exception e) {
+                        logger.error("处理消息时出错: {}", e.getMessage());
+                    }
+                }
+            });
+        } catch (Exception e) {
+            logger.error("订阅 {} 时发生异常: {}", destination, e.getMessage());
+            handleDisconnect();
+        }
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private void resubscribeAll() {
+        if (!isConnected() || subscriptions.isEmpty()) return;
+
+        int successCount = 0;
+        for (Map.Entry<String, SubscriptionEntry<?>> entry : subscriptions.entrySet()) {
+            String destination = entry.getKey();
+            SubscriptionEntry<?> subscription = entry.getValue();
+
+            try {
+                stompSession.subscribe(destination, new StompFrameHandler() {
+                    @Override
+                    public Type getPayloadType(StompHeaders headers) {
+                        return subscription.getType();
+                    }
+
+                    @Override
+                    public void handleFrame(StompHeaders headers, Object payload) {
+                        try {
+                            ((Consumer) subscription.getHandler()).accept(payload);
+                        } catch (Exception e) {
+                            logger.error("处理消息时出错: {}", e.getMessage());
+                        }
+                    }
+                });
+                successCount++;
+            } catch (Exception e) {
+                logger.error("重新订阅 {} 失败: {}", destination, e.getMessage());
+            }
+        }
+        logger.info("成功重新订阅 {}/{} 个主题", successCount, subscriptions.size());
+    }
+
+    private void sendConnectMessage() {
+        if (!isConnected() || sessionManager.getCurrentUser() == null) return;
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", "CONNECT");
+        payload.put("username", sessionManager.getCurrentUser().getUsername());
+        payload.put("timestamp", System.currentTimeMillis());
+        send("/app/user.connect", payload);
+    }
+
+    private void subscribeToHeartbeatResponses() {
+        if (!isConnected()) return;
+        subscribe("/user/queue/heartbeat", Map.class, this::processHeartbeatResponse);
+    }
+
+    private void processHeartbeatResponse(Map<String, Object> payload) {
+        handleHeartbeatResponse();
+    }
+
+    /**
+     * 调度重连
      */
     private void scheduleReconnect() {
-        synchronized (reconnectLock) {
-            if (reconnecting.get() || !autoReconnect) {
-                return;
-            }
+        reconnectLock.lock();
+        try {
+            if (reconnecting.get() || !autoReconnect) return;
 
             int attempts = reconnectAttempts.incrementAndGet();
             if (attempts > MAX_RECONNECT_ATTEMPTS) {
-                logger.error("已达到最大重连次数 ({})，停止重连", MAX_RECONNECT_ATTEMPTS);
                 reconnecting.set(false);
                 reconnectAttempts.set(0);
-
-                // 会话可能已失效，通知用户需要重新登录
                 eventPublisher.publishEvent(new ConnectionFailedEvent(this, "连接尝试失败，请重新登录"));
                 return;
             }
 
-            // 使用指数退避策略，但有最大延迟限制
             long delay = Math.min(
-                    INITIAL_RECONNECT_DELAY_MS * (long)Math.pow(2, attempts - 1),
-                    MAX_RECONNECT_DELAY_MS
-            );
+                    INITIAL_RECONNECT_DELAY_MS * (long) Math.pow(2, attempts - 1),
+                    MAX_RECONNECT_DELAY_MS);
 
             logger.info("计划在 {}ms 后重连 (尝试 {}/{})", delay, attempts, MAX_RECONNECT_ATTEMPTS);
-
             reconnecting.set(true);
-            connectionState.set(ConnectionState.CONNECTING);
+            connectionState.set(ConnectionState.RECONNECTING);
 
             taskScheduler.schedule(() -> {
                 try {
                     boolean connected = connect();
-                    if (connected) {
-                        // 重连成功，重置尝试次数
-                        reconnectAttempts.set(0);
-                        connectionState.set(ConnectionState.CONNECTED);
-                        reconnecting.set(false);
-
-                        // 通知重连成功
-                        eventPublisher.publishEvent(new ReconnectSuccessEvent(this));
-                    } else {
-                        // 重连失败，继续尝试
-                        synchronized (reconnectLock) {
+                    reconnectLock.lock();
+                    try {
+                        if (connected) {
+                            reconnectAttempts.set(0);
+                            connectionState.set(ConnectionState.CONNECTED);
+                            reconnecting.set(false);
+                            eventPublisher.publishEvent(new ReconnectSuccessEvent(this));
+                        } else {
                             reconnecting.set(false);
                             scheduleReconnect();
                         }
+                    } finally {
+                        reconnectLock.unlock();
                     }
                 } catch (Exception e) {
                     logger.error("重连时发生错误", e);
-                    synchronized (reconnectLock) {
+                    reconnectLock.lock();
+                    try {
                         reconnecting.set(false);
                         scheduleReconnect();
+                    } finally {
+                        reconnectLock.unlock();
                     }
                 }
             }, new Date(System.currentTimeMillis() + delay));
+        } finally {
+            reconnectLock.unlock();
         }
     }
 
-    /**
-     * STOMP会话处理器
-     */
+    private void handleConnectionFailure(String errorMessage) {
+        connectionState.set(ConnectionState.FAILED);
+        logger.error(errorMessage);
+        scheduleReconnect();
+    }
+
+    // 内部类
     private class ClientSessionHandler extends StompSessionHandlerAdapter {
         @Override
         public void afterConnected(StompSession session, StompHeaders connectedHeaders) {
@@ -725,9 +715,6 @@ public class WebSocketService {
         }
     }
 
-    /**
-     * 订阅条目，存储类型和处理器
-     */
     private static class SubscriptionEntry<T> {
         private final Class<T> type;
         private final Consumer<T> handler;
