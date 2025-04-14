@@ -5,7 +5,8 @@ public enum FxmlView {
     LOBBY("lobby.fxml", "游戏大厅"),
     ROOM("room.fxml", "游戏房间"),
     SERVER_SETTINGS("server_settings.fxml", "服务器设置"),
-    ROOM_LIST("room_list.fxml", "房间列表");
+    ROOM_LIST("room_list.fxml", "房间列表"),
+    CREATE_ROOM("create_room.fxml", "创建房间");
 
     private final String fxmlFile;
     private final String title;

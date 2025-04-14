@@ -209,3 +209,66 @@
     -fx-text-fill: #c62828;
     -fx-font-weight: bold;
 }
+
+
+/* 用户列表样式 */
+.count-label {
+    -fx-text-fill: #757575;
+}
+
+/* 聊天消息样式 */
+.chat-messages {
+    -fx-background-color: white;
+}
+
+/* 状态标签样式 */
+.status-connected {
+    -fx-text-fill: #4CAF50;
+}
+
+.status-disconnected {
+    -fx-text-fill: #F44336;
+}
+
+/* 小按钮样式 */
+.button-small {
+    -fx-font-size: 11px;
+    -fx-padding: 2 8 2 8;
+}
+
+/* 图标按钮样式 */
+.icon-button {
+    -fx-background-color: transparent;
+    -fx-cursor: hand;
+}
+
+.icon-button:hover {
+    -fx-opacity: 0.8;
+}
+
+/* 用户状态指示器样式 */
+.user-online {
+    -fx-fill: #4CAF50;
+}
+
+.user-offline {
+    -fx-fill: #9E9E9E;
+}
+
+/* 用户标签样式 */
+.user-label {
+    -fx-font-weight: bold;
+}
+
+/* 房间状态样式 */
+.room-waiting {
+    -fx-text-fill: #2196F3;
+}
+
+.room-playing {
+    -fx-text-fill: #4CAF50;
+}
+
+.room-finished {
+    -fx-text-fill: #FF9800;
+}

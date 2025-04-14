@@ -1,12 +1,10 @@
 package com.client.session;
 
 import com.client.model.User;
-import com.client.service.api.UserApiService;
 import javafx.application.Platform;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -15,7 +13,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.function.Consumer;
 import java.util.prefs.Preferences;
 
@@ -27,13 +24,11 @@ public class SessionManager {
     private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
     private static final String PREF_SESSION_ID = "sessionId";
     private static final String PREF_LAST_LOGIN = "lastLogin";
-
+    private static final long SESSION_TIMEOUT = 30 * 60 * 1000; // 30分钟会话超时
     private final StringProperty sessionId = new SimpleStringProperty(null);
     private final List<Consumer<String>> sessionChangeListeners = new ArrayList<>();
     private final Preferences prefs = Preferences.userNodeForPackage(SessionManager.class);
     private final ApplicationEventPublisher eventPublisher;
-
-    private static final long SESSION_TIMEOUT = 30 * 60 * 1000; // 30分钟会话超时
     private Timer sessionTimeoutTimer;
 
     private User currentUser;
@@ -49,6 +44,32 @@ public class SessionManager {
         lastLoginTime = prefs.getLong(PREF_LAST_LOGIN, 0);
 
         logger.debug("初始化SessionManager, 已恢复会话ID: {}", savedSessionId != null);
+    }
+
+    /**
+     * 取消会话超时定时器
+     */
+    private void cancelSessionTimeout() {
+        if (sessionTimeoutTimer != null) {
+            sessionTimeoutTimer.cancel();
+            sessionTimeoutTimer = null;
+        }
+    }
+
+    /**
+     * 清除本地会话
+     */
+    private void clearSession() {
+        setSessionId(null);
+        currentUser = null;
+        prefs.remove(PREF_SESSION_ID);
+    }
+
+    /**
+     * 获取会话ID
+     */
+    public String getSessionId() {
+        return sessionId.get();
     }
 
     /**
@@ -79,32 +100,6 @@ public class SessionManager {
                 }
             });
         }
-    }
-
-    /**
-     * 取消会话超时定时器
-     */
-    private void cancelSessionTimeout() {
-        if (sessionTimeoutTimer != null) {
-            sessionTimeoutTimer.cancel();
-            sessionTimeoutTimer = null;
-        }
-    }
-
-    /**
-     * 清除本地会话
-     */
-    private void clearSession() {
-        setSessionId(null);
-        currentUser = null;
-        prefs.remove(PREF_SESSION_ID);
-    }
-
-    /**
-     * 获取会话ID
-     */
-    public String getSessionId() {
-        return sessionId.get();
     }
 
     /**

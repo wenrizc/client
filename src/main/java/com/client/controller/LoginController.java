@@ -4,10 +4,8 @@ import com.client.config.AppProperties;
 import com.client.network.ApiException;
 import com.client.service.NetworkStatusService;
 import com.client.service.api.UserApiService;
-import com.client.session.SessionManager;
 import com.client.view.FxmlView;
 import com.jfoenix.controls.JFXButton;
-import com.jfoenix.controls.JFXCheckBox;
 import com.jfoenix.controls.JFXPasswordField;
 import com.jfoenix.controls.JFXTextField;
 import javafx.application.Platform;
@@ -18,8 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-
-import java.util.prefs.Preferences;
 
 @Controller
 public class LoginController extends BaseController {
@@ -258,13 +254,5 @@ public class LoginController extends BaseController {
         errorLabel.setText("");
         errorLabel.setManaged(false);
         errorLabel.setVisible(false);
-    }
-
-
-
-    private void executeAsync(Runnable task) {
-        Thread thread = new Thread(task);
-        thread.setDaemon(true);
-        thread.start();
     }
 }

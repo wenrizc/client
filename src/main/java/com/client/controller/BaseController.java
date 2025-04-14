@@ -3,13 +3,12 @@ package com.client.controller;
 import com.client.config.AppProperties;
 import com.client.config.StageManager;
 import com.client.util.ResourceUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
 public abstract class BaseController {
 
@@ -70,4 +69,11 @@ public abstract class BaseController {
      * 初始化控制器
      */
     public abstract void initialize();
+
+
+    protected void executeAsync(Runnable task) {
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        thread.start();
+    }
 }

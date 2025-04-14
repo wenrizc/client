@@ -1,6 +1,7 @@
 package com.client.config;
 
 import com.client.controller.BaseController;
+import com.client.controller.CreateRoomController;
 import com.client.controller.ServerSettingsController;
 import com.client.util.ResourceUtil;
 import com.client.view.FxmlView;
@@ -13,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -165,6 +165,8 @@ public class StageManager {
             // 如果控制器支持设置对话框Stage
             if (controller instanceof ServerSettingsController) {
                 ((ServerSettingsController) controller).setDialogStage(dialogStage);
+            } else if (controller instanceof CreateRoomController) {
+                ((CreateRoomController) controller).setDialogStage(dialogStage);
             }
 
             dialogStage.showAndWait();

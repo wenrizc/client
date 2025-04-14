@@ -5,5 +5,6 @@ public enum ConnectionState {
     CONNECTING,
     CONNECTED,
     RECONNECTING,
-    FAILED
+    FAILED,
+    UNHEALTHY,
 }

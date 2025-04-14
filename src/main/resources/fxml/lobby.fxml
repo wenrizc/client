@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import com.jfoenix.controls.*?>
+<?import de.jensd.fx.glyphs.materialicons.MaterialIconView?>
 <?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -15,7 +16,12 @@
             </padding>
             <Label text="游戏大厅" styleClass="header-label"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label text="用户: 测试用户"/>
+            <Label fx:id="userNameLabel" text="用户: " styleClass="user-label"/>
+            <JFXButton fx:id="helpButton" styleClass="icon-button">
+                <graphic>
+                    <MaterialIconView glyphName="HELP" size="24"/>
+                </graphic>
+            </JFXButton>
         </HBox>
     </top>
 
@@ -25,7 +31,10 @@
                 <Insets top="10" right="10" bottom="10" left="10"/>
             </padding>
 
-            <Label text="在线用户" styleClass="section-label"/>
+            <HBox alignment="CENTER_LEFT" spacing="5">
+                <Label text="在线用户" styleClass="section-label"/>
+                <Label fx:id="onlineCountLabel" text="(0)" styleClass="count-label"/>
+            </HBox>
             <ListView fx:id="userListView" VBox.vgrow="ALWAYS"/>
 
             <JFXButton fx:id="refreshButton" text="刷新" styleClass="button-flat" maxWidth="Infinity"/>
@@ -38,15 +47,21 @@
             <Tab fx:id="chatTab" text="大厅聊天">
                 <BorderPane>
                     <center>
-                        <TextArea editable="false" wrapText="true" prefRowCount="20"/>
+                        <ScrollPane fx:id="chatScrollPane" fitToWidth="true" fitToHeight="true">
+                            <VBox fx:id="chatMessagesBox" styleClass="chat-messages" spacing="5">
+                                <padding>
+                                    <Insets top="10" right="10" bottom="10" left="10"/>
+                                </padding>
+                            </VBox>
+                        </ScrollPane>
                     </center>
                     <bottom>
                         <HBox spacing="10">
                             <padding>
                                 <Insets top="10" right="10" bottom="10" left="10"/>
                             </padding>
-                            <TextField HBox.hgrow="ALWAYS" promptText="输入消息..."/>
-                            <JFXButton text="发送" styleClass="button-raised"/>
+                            <TextField fx:id="messageField" HBox.hgrow="ALWAYS" promptText="输入消息..."/>
+                            <JFXButton fx:id="sendButton" text="发送" styleClass="button-raised"/>
                         </HBox>
                     </bottom>
                 </BorderPane>
@@ -58,15 +73,16 @@
                         <Insets top="10" right="10" bottom="10" left="10"/>
                     </padding>
                     <HBox alignment="CENTER_RIGHT" spacing="10">
-                        <JFXButton text="刷新列表" styleClass="button-flat"/>
-                        <JFXButton text="创建房间" styleClass="button-raised"/>
+                        <JFXButton fx:id="refreshRoomsButton" text="刷新列表" styleClass="button-flat"/>
+                        <JFXButton fx:id="createRoomButton" text="创建房间" styleClass="button-raised"/>
                     </HBox>
-                    <TableView VBox.vgrow="ALWAYS">
+                    <TableView fx:id="roomsTableView" VBox.vgrow="ALWAYS">
                         <columns>
-                            <TableColumn text="房间名称" prefWidth="150"/>
-                            <TableColumn text="游戏名" prefWidth="100"/>
-                            <TableColumn text="人数" prefWidth="80"/>
-                            <TableColumn text="状态" prefWidth="80"/>
+                            <TableColumn fx:id="roomNameColumn" text="房间名称" prefWidth="150"/>
+                            <TableColumn fx:id="gameNameColumn" text="游戏名" prefWidth="100"/>
+                            <TableColumn fx:id="playerCountColumn" text="人数" prefWidth="80"/>
+                            <TableColumn fx:id="roomStatusColumn" text="状态" prefWidth="80"/>
+                            <TableColumn fx:id="actionColumn" text="操作" prefWidth="100"/>
                         </columns>
                     </TableView>
                 </VBox>
@@ -86,19 +102,19 @@
                         </columnConstraints>
 
                         <Label text="用户ID:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
-                        <Label text="1001" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                        <Label fx:id="userIdLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="0"/>
 
                         <Label text="用户名:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-                        <Label text="测试用户" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+                        <Label fx:id="profileUsernameLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
 
                         <Label text="客户端地址:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-                        <Label text="192.168.1.100" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                        <Label fx:id="clientAddressLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="2"/>
 
                         <Label text="虚拟IP:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
-                        <Label text="10.0.0.5" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
+                        <Label fx:id="virtualIpLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="3"/>
                     </GridPane>
 
-                    <JFXButton text="刷新个人信息" styleClass="button-raised"/>
+                    <JFXButton fx:id="refreshProfileButton" text="刷新个人信息" styleClass="button-raised"/>
                 </VBox>
             </Tab>
         </TabPane>
@@ -109,13 +125,21 @@
             <padding>
                 <Insets top="5" right="20" bottom="5" left="20"/>
             </padding>
-            <Label text="已连接到服务器"/>
-            <Separator orientation="VERTICAL"/>
-            <Label text="在线用户: 4"/>
-            <Separator orientation="VERTICAL"/>
-            <Label text="可用房间: 0"/>
+            <Label fx:id="connectionStatusLabel" text="已连接到服务器" styleClass="status-connected"/>
+            <Separator orientation="VERTICAL">
+                <padding>
+                    <Insets left="5" right="5"/>
+                </padding>
+            </Separator>
+            <Label fx:id="onlineUsersStatusLabel" text="在线用户: 0"/>
+            <Separator orientation="VERTICAL">
+                <padding>
+                    <Insets left="5" right="5"/>
+                </padding>
+            </Separator>
+            <Label fx:id="roomsStatusLabel" text="可用房间: 0"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label text="v1.0.0"/>
+            <Label fx:id="versionLabel" text="v1.0.0"/>
         </HBox>
     </bottom>
 </BorderPane>

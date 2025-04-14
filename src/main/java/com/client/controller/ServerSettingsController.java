@@ -260,10 +260,4 @@ public class ServerSettingsController extends BaseController {
         // 重置保存按钮行为
         saveButton.setOnAction(event -> saveSettings());
     }
-
-    private void executeAsync(Runnable task) {
-        Thread thread = new Thread(task);
-        thread.setDaemon(true);
-        thread.start();
-    }
 }
