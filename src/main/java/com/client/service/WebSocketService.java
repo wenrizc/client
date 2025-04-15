@@ -691,6 +691,47 @@ public class WebSocketService {
         scheduleReconnect();
     }
 
+    /**
+     * 取消订阅特定主题
+     */
+    public void unsubscribe(String destination) {
+        if (stompSession != null && stompSession.isConnected()) {
+            try {
+                // 获取当前订阅的StompSession.Subscription对象
+                    StompSession.Subscription subscription = activeSubscriptions.get(destination);
+                if (subscription != null) {
+                    subscription.unsubscribe();
+                    activeSubscriptions.remove(destination);
+                    logger.debug("已取消订阅: {}", destination);
+                }
+            } catch (Exception e) {
+                logger.error("取消订阅 {} 失败: {}", destination, e.getMessage());
+            }
+        }
+        // 从缓存中移除
+        subscriptions.remove(destination);
+    }
+
+    /**
+     * 订阅特定房间的消息
+     */
+    public void subscribeToRoom(Long roomId, Consumer<Map> messageHandler, Consumer<Map> updateHandler) {
+        // 订阅房间聊天消息
+        subscribe("/topic/room." + roomId + ".messages", Map.class, messageHandler);
+
+        // 订阅房间状态更新
+        subscribe("/topic/room." + roomId + ".updates", Map.class, updateHandler);
+    }
+
+    /**
+     * 取消订阅所有系统通知
+     */
+    public void unsubscribeFromSystemNotifications() {
+        unsubscribe("/topic/system.notifications");
+        unsubscribe("/topic/users.status");
+        unsubscribe("/topic/lobby.messages");
+    }
+
     // 内部类
     private class ClientSessionHandler extends StompSessionHandlerAdapter {
         @Override

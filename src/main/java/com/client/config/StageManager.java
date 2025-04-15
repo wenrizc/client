@@ -75,6 +75,7 @@ public class StageManager {
             primaryStage.sizeToScene();
             primaryStage.centerOnScreen();
 
+
             logger.info("场景已切换到: {}", view.getFxmlFile());
         } catch (Exception e) {
             logger.error("切换场景失败: " + view.getFxmlFile(), e);

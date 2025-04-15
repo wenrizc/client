@@ -112,8 +112,6 @@
     -fx-background-color: white;
 }
 
-/* 添加以下样式到现有CSS文件中 */
-
 /* 连接状态样式 */
 .connected {
     -fx-text-fill: #4CAF50;
@@ -271,4 +269,34 @@
 
 .room-finished {
     -fx-text-fill: #FF9800;
+}
+
+/* 添加以下内容到现有CSS文件末尾 */
+
+/* 房间界面样式 */
+.room-pane {
+    -fx-background-color: white;
+}
+
+.room-info {
+    -fx-background-color: #f5f5f5;
+    -fx-padding: 5px;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.info-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: normal;
+}
+
+.players-panel {
+    -fx-background-color: #f8f8f8;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 1 0 0;
+}
+
+.room-content .split-pane-divider {
+    -fx-background-color: #e0e0e0;
+    -fx-padding: 0 1 0 1;
 }

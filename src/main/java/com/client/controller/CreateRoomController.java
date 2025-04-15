@@ -2,6 +2,7 @@ package com.client.controller;
 
 import com.client.model.Room;
 import com.client.service.api.RoomApiService;
+import com.client.view.FxmlView;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXTextField;
 import javafx.collections.FXCollections;
@@ -68,8 +69,8 @@ public class CreateRoomController extends BaseController {
             return;
         }
 
-        if (gameName == null) {
-            showError("请选择游戏类型");
+        if (gameName.isEmpty()) {
+            showError("请输入游戏名称");
             return;
         }
 
@@ -81,9 +82,10 @@ public class CreateRoomController extends BaseController {
             try {
                 Room room = roomApiService.createRoom(roomName, gameName, maxPlayers);
 
-                // 创建成功，关闭对话框
+                // 创建成功，关闭对话框并跳转到房间界面
                 runOnFXThread(() -> {
                     dialogStage.close();
+                    stageManager.switchScene(FxmlView.ROOM);
                 });
             } catch (Exception e) {
                 logger.error("创建房间失败", e);
