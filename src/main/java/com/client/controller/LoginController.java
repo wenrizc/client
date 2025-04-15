@@ -46,6 +46,10 @@ public class LoginController extends BaseController {
     public void initialize() {
         logger.info("初始化登录控制器");
 
+        // 登录按钮状态
+        loginButton.setDisable(false);
+        loginButton.setText("登录");
+
         // 绑定网络状态显示
         connectionStatusLabel.textProperty().bind(networkStatusService.statusMessageProperty());
         networkStatusService.connectedProperty().addListener((obs, oldVal, newVal) -> {
@@ -119,6 +123,8 @@ public class LoginController extends BaseController {
                 Platform.runLater(() -> {
                     logger.info("登录成功，用户: {}", username);
                     stageManager.switchScene(FxmlView.LOBBY);
+                    loginButton.setDisable(false);
+                    loginButton.setText("登录");
                 });
             } catch (ApiException e) {
                 Platform.runLater(() -> {

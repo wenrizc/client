@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.jfoenix.controls.*?>
+<?import de.jensd.fx.glyphs.materialicons.MaterialIconView?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Text?>
+
+<BorderPane styleClass="room-pane" xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.client.controller.RoomController"
+            prefHeight="600.0" prefWidth="800.0">
+
+    <!-- 顶部标题区域 -->
+    <top>
+        <VBox spacing="5">
+            <!-- 房间标题和用户信息 -->
+            <HBox alignment="CENTER_LEFT" styleClass="header">
+                <padding>
+                    <Insets top="10" right="20" bottom="10" left="20"/>
+                </padding>
+                <Label fx:id="roomTitleLabel" text="房间: 加载中..." styleClass="header-label"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="userNameLabel" text="用户: " styleClass="user-label"/>
+                <JFXButton fx:id="helpButton" styleClass="icon-button">
+                    <graphic>
+                        <MaterialIconView glyphName="HELP" size="24"/>
+                    </graphic>
+                </JFXButton>
+            </HBox>
+
+            <!-- 房间信息 -->
+            <HBox alignment="CENTER" styleClass="room-info">
+                <padding>
+                    <Insets top="5" right="10" bottom="5" left="10"/>
+                </padding>
+                <Label fx:id="roomNameLabel" text="房间: 加载中..." styleClass="info-label"/>
+                <Separator orientation="VERTICAL">
+                    <padding>
+                        <Insets left="10" right="10"/>
+                    </padding>
+                </Separator>
+                <Label fx:id="gameNameLabel" text="游戏名: 加载中..." styleClass="info-label"/>
+                <Separator orientation="VERTICAL">
+                    <padding>
+                        <Insets left="10" right="10"/>
+                    </padding>
+                </Separator>
+                <Label fx:id="statusLabel" text="状态: 加载中..." styleClass="info-label"/>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <SplitPane dividerPositions="0.25" styleClass="room-content">
+            <!-- 左侧玩家列表 -->
+            <VBox spacing="10" styleClass="players-panel">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+                <Label text="玩家列表" styleClass="section-label"/>
+                <ListView fx:id="playerListView" VBox.vgrow="ALWAYS"/>
+            </VBox>
+
+            <!-- 右侧聊天区域 -->
+            <VBox spacing="10">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+
+                <!-- 聊天消息区域 -->
+                <ScrollPane fx:id="chatScrollPane" fitToWidth="true" VBox.vgrow="ALWAYS">
+                    <VBox fx:id="chatMessagesBox" styleClass="chat-messages" spacing="5">
+                        <padding>
+                            <Insets top="10" right="10" bottom="10" left="10"/>
+                        </padding>
+                    </VBox>
+                </ScrollPane>
+
+                <!-- 输入消息区域 -->
+                <HBox spacing="10">
+                    <TextField fx:id="messageField" promptText="输入消息..." HBox.hgrow="ALWAYS"/>
+                    <JFXButton fx:id="sendButton" text="发送" styleClass="button-raised"/>
+                </HBox>
+            </VBox>
+        </SplitPane>
+    </center>
+
+    <bottom>
+        <VBox>
+            <!-- 分隔线 -->
+            <Separator/>
+
+            <!-- 底部按钮和状态区域 -->
+            <HBox alignment="CENTER_LEFT" styleClass="footer" spacing="10">
+                <padding>
+                    <Insets top="10" right="20" bottom="10" left="20"/>
+                </padding>
+
+                <!-- 功能按钮 -->
+                <JFXButton fx:id="startGameButton" text="开始游戏" styleClass="button-raised, button-primary"/>
+                <JFXButton fx:id="leaveRoomButton" text="离开房间" styleClass="button-raised"/>
+                <JFXButton fx:id="networkInfoButton" text="连接信息" styleClass="button-flat"/>
+
+                <Region HBox.hgrow="ALWAYS"/>
+
+                <!-- 状态信息 -->
+                <Label fx:id="roomStatusLabel" text="房间状态: 加载中..." styleClass="status-label"/>
+            </HBox>
+        </VBox>
+    </bottom>
+</BorderPane>

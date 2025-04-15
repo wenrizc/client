@@ -2,6 +2,8 @@ package com.client;
 
 import com.client.config.AppProperties;
 import com.client.config.StageManager;
+import com.client.service.api.UserApiService;
+import com.client.session.SessionManager;
 import com.client.view.FxmlView;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -59,6 +61,21 @@ public class ClientApplication extends Application {
     @Override
     public void stop() {
         try {
+            // 添加自动登出逻辑
+            UserApiService userApiService = applicationContext.getBean(UserApiService.class);
+            SessionManager sessionManager = applicationContext.getBean(SessionManager.class);
+
+            // 如果用户已登录，则发送登出请求
+            if (sessionManager.hasValidSession()) {
+                logger.info("应用关闭，正在执行自动登出...");
+                try {
+                    // 尝试向服务器发送登出请求
+                    userApiService.logout();
+                } catch (Exception e) {
+                    logger.error("自动登出过程中发生错误", e);
+                }
+            }
+
             logger.info("正在关闭Spring Boot应用程序上下文...");
             applicationContext.close();
             Platform.exit();

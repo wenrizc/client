@@ -5,12 +5,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,8 +50,8 @@ public class WebSocketService {
     private static final long MAX_RECONNECT_DELAY_MS = 30000;
 
     // 心跳相关配置
-    private static final long HEARTBEAT_INTERVAL_MS = 10000;  // 10秒，与STOMP配置保持一致
-    private static final long HEARTBEAT_TIMEOUT_MS = 30000;   // 30秒，更合理的超时时间
+    private static final long HEARTBEAT_INTERVAL_MS = 10000;  // 10秒发送一次心跳
+    private static final long HEARTBEAT_TIMEOUT_MS = 30000;   // 30秒无响应判断为超时
 
     // 连接健康检查
     private static final long HEALTH_CHECK_INTERVAL_MS = 60000; // 1分钟检查一次连接健康状况
@@ -138,7 +137,8 @@ public class WebSocketService {
             if (wsUrl.startsWith("ws://")) wsUrl = "http://" + wsUrl.substring(5);
             else if (wsUrl.startsWith("wss://")) wsUrl = "https://" + wsUrl.substring(6);
 
-            wsUrl = wsUrl + "?sessionId=" + sessionId;
+            wsUrl = wsUrl + "?JSESSIONID=" + sessionId;
+
             logger.info("连接WebSocket: {}", wsUrl);
 
             stompClient.setDefaultHeartbeat(new long[] { HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS });
@@ -165,7 +165,7 @@ public class WebSocketService {
             Thread.currentThread().interrupt();
             handleConnectionFailure("WebSocket连接被中断: " + e.getMessage());
             return false;
-        } catch (ExecutionException | TimeoutException e) {
+        } catch (Exception e) {
             lastErrorMessage = e.getMessage();
             handleConnectionFailure("WebSocket连接失败: " + e.getMessage());
             return false;
@@ -265,8 +265,8 @@ public class WebSocketService {
     }
 
     // 订阅方法
-    public void subscribeLobbyMessages(Consumer<Message> messageHandler) {
-        subscribe("/topic/lobby.messages", Message.class, messageHandler);
+    public void subscribeLobbyMessages(Consumer<Map> messageHandler) {
+        subscribe("/topic/lobby.messages", Map.class, messageHandler);
     }
 
     public void subscribeRoomMessages(Long roomId, Consumer<Message> messageHandler) {
@@ -366,27 +366,29 @@ public class WebSocketService {
      */
     public void startHeartbeat() {
         stopHeartbeat();
-        lastHeartbeatResponse.set(Instant.now());
 
+        // 定期发送心跳
         heartbeatTask = taskScheduler.scheduleWithFixedDelay(() -> {
             try {
-                if (isConnected()) sendHeartbeat();
+                if (isConnected()) {
+                    sendHeartbeat();
+                }
             } catch (Exception e) {
-                logger.error("心跳任务异常: {}", e.getMessage());
-                heartbeatFailures.incrementAndGet();
-                updateConnectionStateBasedOnHealth();
+                logger.error("心跳发送任务异常: {}", e.getMessage());
             }
         }, HEARTBEAT_INTERVAL_MS);
 
+        // 检查心跳响应
         heartbeatCheckTask = taskScheduler.scheduleWithFixedDelay(() -> {
             try {
-                if (isConnected() && Duration.between(lastHeartbeatResponse.get(), Instant.now()).toMillis()
-                        > HEARTBEAT_TIMEOUT_MS) {
-                    logger.warn("心跳超时，标记连接为不健康");
-                    connectionState.set(ConnectionState.UNHEALTHY);
-                    heartbeatFailures.incrementAndGet();
-                    if (heartbeatFailures.get() > 3) { // 连续3次心跳失败则主动断开
-                        handleDisconnect();
+                if (isConnected()) {
+                    long timeSinceLastHeartbeat = Duration.between(lastHeartbeatResponse.get(), Instant.now()).toMillis();
+                    if (timeSinceLastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
+                        logger.warn("心跳超时: 最后一次响应在 {}ms 前", timeSinceLastHeartbeat);
+                        heartbeatFailures.incrementAndGet();
+                        if (heartbeatFailures.get() > 3) { // 连续3次心跳失败则主动断开
+                            handleDisconnect();
+                        }
                     }
                 }
             } catch (Exception e) {

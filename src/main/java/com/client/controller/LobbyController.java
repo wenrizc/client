@@ -165,7 +165,19 @@ public class LobbyController extends BaseController {
     private void subscribeToTopics() {
         // 订阅大厅消息
         webSocketService.subscribeLobbyMessages(message -> {
-            displayChatMessage((Map<String, Object>) message);
+            try {
+                // 添加日志帮助调试
+                logger.debug("收到大厅消息: {}", message);
+
+                // 安全地处理消息
+                if (message instanceof Map) {
+                    displayChatMessage((Map<String, Object>) message);
+                } else {
+                    logger.error("收到了意外类型的大厅消息: {}", message.getClass().getName());
+                }
+            } catch (Exception e) {
+                logger.error("处理大厅消息时出错", e);
+            }
         });
 
         // 订阅用户状态更新

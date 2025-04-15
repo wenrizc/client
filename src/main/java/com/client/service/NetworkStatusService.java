@@ -58,8 +58,6 @@ public class NetworkStatusService {
                 statusMessage.set("已连接");
             } else if (!httpConnected) {
                 statusMessage.set("服务器连接失败");
-            } else {
-                statusMessage.set("WebSocket连接失败");
             }
         });
     }

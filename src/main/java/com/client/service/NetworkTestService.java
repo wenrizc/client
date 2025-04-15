@@ -514,9 +514,10 @@ public class NetworkTestService implements ApplicationRunner {
         AtomicBoolean messageReceived = new AtomicBoolean(false);
         CountDownLatch latch = new CountDownLatch(1);
 
-        webSocketService.subscribeLobbyMessages(message -> {
-            if (message.getMessage() != null && message.getMessage().contains("网络测试")) {
-                NetworkTestLogger.info("收到自己发送的测试消息: " + message.getMessage());
+        webSocketService.subscribeLobbyMessages(messageMap -> {
+            String messageContent = (String) messageMap.get("message");
+            if (messageContent != null && messageContent.contains("网络测试")) {
+                NetworkTestLogger.info("收到自己发送的测试消息: " + messageContent);
                 messageReceived.set(true);
                 latch.countDown();
             }

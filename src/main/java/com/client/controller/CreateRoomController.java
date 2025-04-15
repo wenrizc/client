@@ -22,7 +22,7 @@ public class CreateRoomController extends BaseController {
     private static final Logger logger = LoggerFactory.getLogger(CreateRoomController.class);
 
     @FXML private JFXTextField roomNameField;
-    @FXML private ComboBox<String> gameTypeComboBox;
+    @FXML private JFXTextField gameNameField;
     @FXML private Spinner<Integer> maxPlayersSpinner;
     @FXML private JFXButton createButton;
     @FXML private JFXButton cancelButton;
@@ -40,12 +40,6 @@ public class CreateRoomController extends BaseController {
     public void initialize() {
         logger.info("初始化创建房间控制器");
 
-        // 初始化游戏类型下拉框
-        gameTypeComboBox.setItems(FXCollections.observableArrayList(
-                "五子棋", "象棋", "围棋", "国际象棋", "其他"
-        ));
-        gameTypeComboBox.getSelectionModel().selectFirst();
-
         // 初始化玩家数量微调器
         SpinnerValueFactory<Integer> valueFactory =
                 new SpinnerValueFactory.IntegerSpinnerValueFactory(2, 10, 4);
@@ -57,7 +51,7 @@ public class CreateRoomController extends BaseController {
 
         // 添加输入监听，清除错误
         roomNameField.textProperty().addListener((obs, old, newVal) -> hideError());
-        gameTypeComboBox.getSelectionModel().selectedItemProperty().addListener((obs, old, newVal) -> hideError());
+        gameNameField.textProperty().addListener((obs, old, newVal) -> hideError()); // 更新监听器
     }
 
     /**
@@ -65,7 +59,7 @@ public class CreateRoomController extends BaseController {
      */
     private void createRoom() {
         String roomName = roomNameField.getText().trim();
-        String gameType = gameTypeComboBox.getValue();
+        String gameName = gameNameField.getText().trim();
         int maxPlayers = maxPlayersSpinner.getValue();
 
         // 验证输入
@@ -74,7 +68,7 @@ public class CreateRoomController extends BaseController {
             return;
         }
 
-        if (gameType == null) {
+        if (gameName == null) {
             showError("请选择游戏类型");
             return;
         }
@@ -85,7 +79,7 @@ public class CreateRoomController extends BaseController {
         // 异步执行创建操作
         executeAsync(() -> {
             try {
-                Room room = roomApiService.createRoom(roomName, gameType, maxPlayers);
+                Room room = roomApiService.createRoom(roomName, gameName, maxPlayers);
 
                 // 创建成功，关闭对话框
                 runOnFXThread(() -> {

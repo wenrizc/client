@@ -27,8 +27,8 @@
                       GridPane.columnIndex="1" GridPane.rowIndex="0"/>
 
         <Label text="游戏名:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
-        <ComboBox fx:id="gameTypeComboBox" promptText="选择游戏类型"
-                  GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+        <JFXTextField fx:id="gameNameField" promptText="输入游戏名称"
+                      GridPane.columnIndex="1" GridPane.rowIndex="1"/>
 
         <Label text="最大玩家数:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
         <HBox spacing="10" GridPane.columnIndex="1" GridPane.rowIndex="2">
