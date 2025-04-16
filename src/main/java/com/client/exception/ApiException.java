@@ -1,4 +1,4 @@
-package com.client.network;
+package com.client.exception;
 
 public class ApiException extends RuntimeException {
 

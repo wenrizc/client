@@ -1,4 +1,4 @@
-package com.client.service.api;
+package com.client.service;
 
 import com.client.model.Room;
 import com.client.exception.ApiException;

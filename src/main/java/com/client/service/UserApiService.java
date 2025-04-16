@@ -1,4 +1,4 @@
-package com.client.service.api;
+package com.client.service;
 
 import com.client.config.AppProperties;
 import com.client.model.NetworkInfo;
@@ -21,7 +21,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 用户API服务，处理与用户相关的API调用
+ * 用户API服务
+ * <p>
+ * 处理与用户相关的API调用，包括身份验证、用户信息获取和会话管理
+ * </p>
  */
 @Service
 public class UserApiService {
@@ -29,16 +32,16 @@ public class UserApiService {
 
     private final WebClient webClient;
     private final SessionManager sessionManager;
-    private final AppProperties appProperties;
 
+    /**
+     * 构造函数，初始化Web客户端
+     */
     @Autowired
     public UserApiService(WebClient.Builder webClientBuilder,
                           SessionManager sessionManager,
                           AppProperties appProperties) {
         this.sessionManager = sessionManager;
-        this.appProperties = appProperties;
 
-        // 根据配置文件初始化WebClient
         this.webClient = webClientBuilder
                 .baseUrl(appProperties.getServerUrl())
                 .defaultHeader("User-Agent", "GameHallClient/" + appProperties.getVersion())
@@ -48,7 +51,7 @@ public class UserApiService {
     }
 
     /**
-     * 用户登录/注册
+     * 用户登录或注册
      *
      * @param username 用户名
      * @param password 密码
@@ -90,14 +93,13 @@ public class UserApiService {
                             }
                         }
 
-                        // 返回响应体
                         return response.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {});
                     })
                     .map(response -> {
                         User user = new User();
 
                         try {
-                            // 安全地设置 ID
+                            // 解析用户ID
                             if (response.containsKey("id")) {
                                 Object idObj = response.get("id");
                                 if (idObj instanceof Number) {
@@ -111,20 +113,20 @@ public class UserApiService {
                                 }
                             }
 
-                            // 安全地设置用户名
+                            // 设置用户名
                             if (response.containsKey("username") && response.get("username") != null) {
                                 user.setUsername(response.get("username").toString());
                             }
 
-                            // 检查返回的用户数据是否有效
+                            // 验证数据完整性
                             if (user.getId() == null || user.getUsername() == null) {
                                 throw new ApiException("服务器返回的用户数据不完整", 500);
                             }
 
                             // 保存用户信息
                             sessionManager.setCurrentUser(user);
-
                             logger.info("用户 {} (ID: {}) 登录成功", user.getUsername(), user.getId());
+
                             return user;
                         } catch (Exception e) {
                             if (e instanceof ApiException) {
@@ -138,21 +140,17 @@ public class UserApiService {
         } catch (WebClientResponseException e) {
             logger.error("登录请求失败: HTTP {} - {}", e.getStatusCode().value(), e.getMessage());
 
-            // 尝试从响应中获取错误信息
             try {
                 Map<String, Object> errorResponse = e.getResponseBodyAs(Map.class);
                 if (errorResponse != null && errorResponse.containsKey("error")) {
-                    String errorMsg = errorResponse.get("error").toString();
-                    throw new ApiException(errorMsg, e.getStatusCode().value());
+                    throw new ApiException(errorResponse.get("error").toString(), e.getStatusCode().value());
                 } else {
-                    throw new ApiException("登录失败: " + e.getMessage(),
-                            e.getStatusCode().value());
+                    throw new ApiException("登录失败: " + e.getMessage(), e.getStatusCode().value());
                 }
             } catch (Exception parseEx) {
                 if (parseEx instanceof ApiException) {
                     throw (ApiException) parseEx;
                 }
-                // 如果无法解析错误响应，返回通用错误
                 throw new ApiException("无法连接到服务器: " + e.getMessage(), e.getStatusCode().value());
             }
         } catch (Exception e) {
@@ -165,34 +163,44 @@ public class UserApiService {
     }
 
     /**
-     * 从Set-Cookie头提取JSESSIONID
+     * 用户登出
+     *
+     * @return 是否成功登出
      */
-    private String extractSessionId(String cookieHeader) {
+    public boolean logout() {
+        if (!sessionManager.hasValidSession()) {
+            return false;
+        }
+
         try {
-            // 格式通常是: JSESSIONID=abcdef1234; Path=/; HttpOnly
-            int start = cookieHeader.indexOf("JSESSIONID=") + "JSESSIONID=".length();
-            int end = cookieHeader.indexOf(';', start);
-            if (end == -1) {
-                // 如果没有分号，就取到字符串结尾
-                end = cookieHeader.length();
-            }
-            if (start > 0 && start < end) {
-                return cookieHeader.substring(start, end);
-            }
-            return null;
+            webClient.post()
+                    .uri("/api/users/logout")
+                    .header("Cookie", "JSESSIONID=" + sessionManager.getSessionId())
+                    .retrieve()
+                    .onStatus(status -> status.isError(), response ->
+                            Mono.error(new ApiException("登出请求失败", response.statusCode().value()))
+                    )
+                    .bodyToMono(Map.class)
+                    .block();
+
+            return true;
         } catch (Exception e) {
-            logger.error("提取SessionID时出错", e);
-            return null;
+            logger.error("登出过程中发生错误", e);
+            return false;
+        } finally {
+            // 无论服务端登出是否成功，都清除本地会话
+            sessionManager.invalidateSession();
         }
     }
 
     /**
-     * 获取当前用户信息
+     * 获取当前登录用户信息
+     *
+     * @return 当前用户对象
+     * @throws ApiException 如果用户未登录或获取失败
      */
     public User getCurrentUser() {
-        if (!sessionManager.hasValidSession()) {
-            throw new ApiException("用户未登录", 401);
-        }
+        validateSession();
 
         try {
             Map<String, Object> userInfo = webClient.get()
@@ -219,7 +227,6 @@ public class UserApiService {
 
                 // 更新当前用户信息
                 sessionManager.setCurrentUser(user);
-
                 return user;
             }
 
@@ -232,20 +239,19 @@ public class UserApiService {
             }
             throw new ApiException("获取用户信息失败: " + e.getMessage(), e.getStatusCode().value());
         } catch (Exception e) {
-            if (e instanceof ApiException) {
-                throw (ApiException) e;
-            }
-            throw new ApiException("获取用户信息失败: " + e.getMessage(), 500);
+            handleApiException(e, "获取用户信息失败");
+            return null; // 不会执行到这里，handleApiException会抛出异常
         }
     }
 
     /**
-     * 获取所有在线用户
+     * 获取所有在线用户列表
+     *
+     * @return 在线用户列表
+     * @throws ApiException 如果用户未登录或获取失败
      */
     public List<User> getAllActiveUsers() {
-        if (!sessionManager.hasValidSession()) {
-            throw new ApiException("用户未登录", 401);
-        }
+        validateSession();
 
         try {
             return webClient.get()
@@ -262,20 +268,19 @@ public class UserApiService {
                     .bodyToMono(new ParameterizedTypeReference<List<User>>() {})
                     .block();
         } catch (Exception e) {
-            if (e instanceof ApiException) {
-                throw (ApiException) e;
-            }
-            throw new ApiException("获取在线用户失败: " + e.getMessage(), 500);
+            handleApiException(e, "获取在线用户失败");
+            return null; // 不会执行到这里，handleApiException会抛出异常
         }
     }
 
     /**
-     * 获取网络信息
+     * 获取用户网络连接信息
+     *
+     * @return 网络信息对象
+     * @throws ApiException 如果用户未登录或获取失败
      */
     public NetworkInfo getNetworkInfo() {
-        if (!sessionManager.hasValidSession()) {
-            throw new ApiException("用户未登录", 401);
-        }
+        validateSession();
 
         try {
             Map<String, Object> response = webClient.get()
@@ -316,39 +321,61 @@ public class UserApiService {
             }
             throw new ApiException("获取网络信息失败: 返回格式错误", 500);
         } catch (Exception e) {
-            if (e instanceof ApiException) {
-                throw (ApiException) e;
-            }
-            throw new ApiException("获取网络信息失败: " + e.getMessage(), 500);
+            handleApiException(e, "获取网络信息失败");
+            return null; // 不会执行到这里，handleApiException会抛出异常
         }
     }
 
     /**
-     * 登出
+     * 验证当前会话是否有效
+     *
+     * @throws ApiException 如果会话无效
      */
-    public boolean logout() {
+    private void validateSession() {
         if (!sessionManager.hasValidSession()) {
-            return false;
+            throw new ApiException("用户未登录", 401);
         }
+    }
 
+    /**
+     * 统一处理API异常
+     *
+     * @param e 捕获的异常
+     * @param defaultMessage 默认错误消息
+     * @throws ApiException 包装后的API异常
+     */
+    private void handleApiException(Exception e, String defaultMessage) {
+        if (e instanceof ApiException) {
+            throw (ApiException) e;
+        }
+        throw new ApiException(defaultMessage + ": " + e.getMessage(), 500);
+    }
+
+    /**
+     * 从Set-Cookie头提取JSESSIONID
+     *
+     * @param cookieHeader Cookie头内容
+     * @return 提取的会话ID
+     */
+    private String extractSessionId(String cookieHeader) {
         try {
-            webClient.post()
-                    .uri("/api/users/logout")
-                    .header("Cookie", "JSESSIONID=" + sessionManager.getSessionId())
-                    .retrieve()
-                    .onStatus(status -> status.isError(), response ->
-                            Mono.error(new ApiException("登出请求失败", response.statusCode().value()))
-                    )
-                    .bodyToMono(Map.class)
-                    .block();
+            // 格式通常是: JSESSIONID=abcdef1234; Path=/; HttpOnly
+            String marker = "JSESSIONID=";
+            int start = cookieHeader.indexOf(marker) + marker.length();
+            int end = cookieHeader.indexOf(';', start);
 
-            return true;
+            // 如果没有分号，就取到字符串结尾
+            if (end == -1) {
+                end = cookieHeader.length();
+            }
+
+            if (start > marker.length() - 1 && start < end) {
+                return cookieHeader.substring(start, end);
+            }
+            return null;
         } catch (Exception e) {
-            logger.error("登出过程中发生错误", e);
-            return false;
-        } finally {
-            // 无论服务端登出是否成功，都清除本地会话
-            sessionManager.invalidateSession();
+            logger.error("提取SessionID时出错", e);
+            return null;
         }
     }
 }

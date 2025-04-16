@@ -1,9 +1,9 @@
 package com.client.controller;
 
 import com.client.config.AppProperties;
-import com.client.network.ApiException;
+import com.client.exception.ApiException;
 import com.client.service.NetworkStatusService;
-import com.client.service.api.UserApiService;
+import com.client.service.UserApiService;
 import com.client.view.FxmlView;
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXPasswordField;
@@ -17,36 +17,45 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 
+/**
+ * 登录界面控制器
+ * 处理用户登录、注册和服务器设置
+ */
 @Controller
 public class LoginController extends BaseController {
 
     private static final Logger logger = LoggerFactory.getLogger(LoginController.class);
-    @FXML
-    private JFXTextField usernameField;
-    @FXML
-    private JFXPasswordField passwordField;
-    @FXML
-    private JFXButton loginButton;
-    @FXML
-    private JFXButton registerButton;
-    @FXML
-    private JFXButton settingsButton;
-    @FXML
-    private Label errorLabel;
-    @FXML
-    private Label connectionStatusLabel;
-    @Autowired
-    private UserApiService userApiService;
-    @Autowired
-    private NetworkStatusService networkStatusService;
-    @Autowired
-    private AppProperties appProperties;
 
+    @FXML private JFXTextField usernameField;
+    @FXML private JFXPasswordField passwordField;
+    @FXML private JFXButton loginButton;
+    @FXML private JFXButton registerButton;
+    @FXML private JFXButton settingsButton;
+    @FXML private Label errorLabel;
+    @FXML private Label connectionStatusLabel;
+
+    @Autowired private UserApiService userApiService;
+    @Autowired private NetworkStatusService networkStatusService;
+    @Autowired private AppProperties appProperties;
+
+    /**
+     * 初始化控制器
+     */
     @Override
     public void initialize() {
         logger.info("初始化登录控制器");
 
-        // 登录按钮状态
+        initializeUI();
+        setupEventHandlers();
+        applyButtonStyles();
+        updateConnectionStatus();
+    }
+
+    /**
+     * 初始化UI组件状态
+     */
+    private void initializeUI() {
+        // 初始化登录按钮状态
         loginButton.setDisable(false);
         loginButton.setText("登录");
 
@@ -63,6 +72,14 @@ public class LoginController extends BaseController {
         connectionStatusLabel.getStyleClass().add("status-label");
         connectionStatusLabel.getStyleClass().add(networkStatusService.isConnected() ? "connected" : "disconnected");
 
+        // 隐藏错误标签
+        clearError();
+    }
+
+    /**
+     * 设置事件处理器
+     */
+    private void setupEventHandlers() {
         // 设置按钮事件
         loginButton.setOnAction(event -> handleLogin());
         registerButton.setOnAction(event -> handleRegister());
@@ -72,17 +89,14 @@ public class LoginController extends BaseController {
         usernameField.textProperty().addListener((obs, oldVal, newVal) -> clearError());
         passwordField.textProperty().addListener((obs, oldVal, newVal) -> clearError());
 
-        // 处理回车键登录
+        // 处理回车键
         passwordField.setOnAction(event -> handleLogin());
         usernameField.setOnAction(event -> passwordField.requestFocus());
-
-        // 初始化显示服务器地址
-        updateConnectionStatus();
-
-        // 应用样式
-        applyButtonStyles();
     }
 
+    /**
+     * 应用按钮样式
+     */
     private void applyButtonStyles() {
         // 添加Material Design风格
         loginButton.getStyleClass().add("button-primary");
@@ -94,11 +108,25 @@ public class LoginController extends BaseController {
         setupButtonHoverEffect(settingsButton);
     }
 
+    /**
+     * 设置按钮悬停效果
+     */
     private void setupButtonHoverEffect(Button button) {
         button.setOnMouseEntered(e -> button.setOpacity(0.8));
         button.setOnMouseExited(e -> button.setOpacity(1.0));
     }
 
+    /**
+     * 更新连接状态信息
+     */
+    private void updateConnectionStatus() {
+        String serverUrl = appProperties.getServerUrl();
+        logger.info("当前连接到服务器: {}", serverUrl);
+    }
+
+    /**
+     * 处理登录事件
+     */
     private void handleLogin() {
         logger.debug("处理登录事件");
         clearError();
@@ -113,56 +141,12 @@ public class LoginController extends BaseController {
         loginButton.setDisable(true);
         loginButton.setText("登录中...");
 
-        // 异步执行登录操作
-        executeAsync(() -> {
-            try {
-                // 调用登录API
-                userApiService.login(username, password);
-
-                // 登录成功，跳转到大厅
-                Platform.runLater(() -> {
-                    logger.info("登录成功，用户: {}", username);
-                    stageManager.switchScene(FxmlView.LOBBY);
-                    loginButton.setDisable(false);
-                    loginButton.setText("登录");
-                });
-            } catch (ApiException e) {
-                Platform.runLater(() -> {
-                    String errorMsg = getFormattedErrorMessage(e);
-                    showError(errorMsg);
-                    loginButton.setDisable(false);
-                    loginButton.setText("登录");
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    showError("无法连接到服务器，请检查网络或服务器设置");
-                    logger.error("登录时发生错误", e);
-                    loginButton.setDisable(false);
-                    loginButton.setText("登录");
-                });
-            }
-        });
+        executeAsync(() -> performAuthentication(username, password, true));
     }
 
-    // 添加更友好的错误信息格式化
-    private String getFormattedErrorMessage(ApiException e) {
-        String message = e.getMessage();
-        if (message.contains("密码错误")) {
-            return "密码错误，请重试";
-        } else if (message.contains("用户名不存在")) {
-            return "用户名不存在，请注册";
-        } else if (message.contains("连接超时")) {
-            return "连接服务器超时，请检查网络";
-        }
-        return "登录失败: " + message;
-    }
-
-    private void updateConnectionStatus() {
-        String serverUrl = appProperties.getServerUrl();
-        logger.info("当前连接到服务器: {}", serverUrl);
-    }
-
-
+    /**
+     * 处理注册事件
+     */
     private void handleRegister() {
         logger.debug("处理注册事件");
         clearError();
@@ -175,41 +159,86 @@ public class LoginController extends BaseController {
         }
 
         registerButton.setDisable(true);
-
-        // 异步执行注册操作（实际上通过同一个API）
-        executeAsync(() -> {
-            try {
-                // 在游戏大厅系统中，登录和注册使用同一个API端点
-                userApiService.login(username, password);
-
-                // 注册/登录成功，跳转到大厅
-                Platform.runLater(() -> {
-                    logger.info("注册成功，用户: {}", username);
-                    stageManager.switchScene(FxmlView.LOBBY);
-                });
-            } catch (ApiException e) {
-                Platform.runLater(() -> {
-                    showError("注册失败: " + e.getMessage());
-                    registerButton.setDisable(false);
-                });
-            } catch (Exception e) {
-                Platform.runLater(() -> {
-                    showError("无法连接到服务器");
-                    logger.error("注册时发生错误", e);
-                    registerButton.setDisable(false);
-                });
-            }
-        });
+        executeAsync(() -> performAuthentication(username, password, false));
     }
 
+    /**
+     * 执行认证操作
+     *
+     * @param username 用户名
+     * @param password 密码
+     * @param isLogin 是否为登录操作
+     */
+    private void performAuthentication(String username, String password, boolean isLogin) {
+        try {
+            userApiService.login(username, password);
+
+            Platform.runLater(() -> {
+                logger.info("{}成功，用户: {}", isLogin ? "登录" : "注册", username);
+                stageManager.switchScene(FxmlView.LOBBY);
+
+                if (isLogin) {
+                    loginButton.setDisable(false);
+                    loginButton.setText("登录");
+                } else {
+                    registerButton.setDisable(false);
+                }
+            });
+        } catch (ApiException e) {
+            Platform.runLater(() -> {
+                if (isLogin) {
+                    showError(getFormattedErrorMessage(e));
+                    loginButton.setDisable(false);
+                    loginButton.setText("登录");
+                } else {
+                    showError("注册失败: " + e.getMessage());
+                    registerButton.setDisable(false);
+                }
+            });
+        } catch (Exception e) {
+            Platform.runLater(() -> {
+                showError("无法连接到服务器，请检查网络或服务器设置");
+                logger.error("{}时发生错误", isLogin ? "登录" : "注册", e);
+
+                if (isLogin) {
+                    loginButton.setDisable(false);
+                    loginButton.setText("登录");
+                } else {
+                    registerButton.setDisable(false);
+                }
+            });
+        }
+    }
+
+    /**
+     * 处理服务器设置事件
+     */
     private void handleSettings() {
         logger.debug("打开服务器设置对话框");
         stageManager.openDialog(FxmlView.SERVER_SETTINGS);
-
-        // 设置完成后更新连接状态
         updateConnectionStatus();
     }
 
+    /**
+     * 格式化API异常消息为用户友好的提示
+     */
+    private String getFormattedErrorMessage(ApiException e) {
+        String message = e.getMessage();
+        if (message.contains("密码错误")) {
+            return "密码错误，请重试";
+        } else if (message.contains("用户名不存在")) {
+            return "用户名不存在，请注册";
+        } else if (message.contains("连接超时")) {
+            return "连接服务器超时，请检查网络";
+        }
+        return "登录失败: " + message;
+    }
+
+    /**
+     * 验证用户输入
+     *
+     * @return 输入是否有效
+     */
     private boolean validateInputs(String username, String password) {
         if (username.isEmpty()) {
             showError("用户名不能为空");
@@ -250,12 +279,18 @@ public class LoginController extends BaseController {
         return true;
     }
 
+    /**
+     * 显示错误消息
+     */
     private void showError(String message) {
         errorLabel.setText(message);
         errorLabel.setManaged(true);
         errorLabel.setVisible(true);
     }
 
+    /**
+     * 清除错误消息
+     */
     private void clearError() {
         errorLabel.setText("");
         errorLabel.setManaged(false);

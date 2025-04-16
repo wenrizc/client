@@ -1,6 +1,6 @@
 package com.client.config;
 
-import com.client.network.ErrorHandlingExchangeFilterFunction;
+import com.client.util.ErrorHandlingExchangeFilterFunction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

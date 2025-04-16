@@ -1,4 +1,4 @@
-package com.client.network;
+package com.client.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

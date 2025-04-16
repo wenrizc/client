@@ -1,4 +1,4 @@
-package com.client.network;
+package com.client.enums;
 
 public enum ConnectionState {
     DISCONNECTED,

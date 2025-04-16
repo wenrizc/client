@@ -18,6 +18,10 @@ import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 服务器设置控制器
+ * 提供服务器URL配置和连接测试功能
+ */
 @Controller
 public class ServerSettingsController extends BaseController {
 
@@ -28,17 +32,25 @@ public class ServerSettingsController extends BaseController {
     @FXML private JFXButton saveButton;
     @FXML private JFXButton cancelButton;
     @FXML private Label statusLabel;
-    @FXML private Label statusDetailsLabel; // 新增：用于显示详细连接信息
+    @FXML private Label statusDetailsLabel;
 
-    @Autowired private AppProperties appProperties;
-    @Autowired private NetworkStatusService networkStatusService;
+    @Autowired
+    private AppProperties appProperties;
+    @Autowired
+    private NetworkStatusService networkStatusService;
 
     private Stage dialogStage;
 
+    /**
+     * 设置对话框舞台引用
+     */
     public void setDialogStage(Stage dialogStage) {
         this.dialogStage = dialogStage;
     }
 
+    /**
+     * 初始化控制器
+     */
     @Override
     public void initialize() {
         logger.info("初始化服务器设置控制器");
@@ -61,6 +73,9 @@ public class ServerSettingsController extends BaseController {
         }
     }
 
+    /**
+     * 测试服务器连接
+     */
     private void testConnection() {
         String url = serverUrlField.getText().trim();
         if (!validateUrl(url)) {
@@ -83,18 +98,21 @@ public class ServerSettingsController extends BaseController {
             Platform.runLater(() -> {
                 if (isConnected) {
                     showStatus("连接成功", true);
-                    showStatusDetails(details);
                 } else {
                     showStatus("连接失败", false);
-                    showStatusDetails(message + ": " + details);
                 }
+                showStatusDetails(isConnected ? details : message + ": " + details);
                 testConnectionButton.setDisable(false);
                 testConnectionButton.setText("测试连接");
             });
         });
     }
 
-    // 更新现有的checkServerConnection方法，返回更详细的连接信息
+    /**
+     * 检查服务器连接状态
+     * @param serverUrl 要测试的服务器URL
+     * @return 连接结果Map，包含success(布尔)、message(字符串)和details(字符串)
+     */
     private Map<String, Object> checkServerConnection(String serverUrl) {
         Map<String, Object> result = new HashMap<>();
         result.put("success", false);
@@ -125,40 +143,38 @@ public class ServerSettingsController extends BaseController {
                 result.put("success", true);
                 result.put("message", "连接成功");
                 result.put("details", "响应时间: " + responseTime + "ms, 服务器状态正常");
-                return result;
             } else {
                 result.put("message", "服务器返回错误状态码");
                 result.put("details", "状态码: " + responseCode + ", 响应时间: " + responseTime + "ms");
-                return result;
             }
         } catch (UnknownHostException e) {
             logger.warn("无法解析主机名: {}", e.getMessage());
             result.put("message", "无法连接到服务器");
             result.put("details", "找不到服务器或DNS解析失败");
-            return result;
         } catch (SocketTimeoutException e) {
             logger.warn("连接超时: {}", e.getMessage());
             result.put("message", "连接超时");
             result.put("details", "服务器响应时间超过5秒");
-            return result;
         } catch (MalformedURLException e) {
             logger.warn("URL格式错误: {}", e.getMessage());
             result.put("message", "URL格式错误");
             result.put("details", e.getMessage());
-            return result;
         } catch (IOException e) {
             logger.warn("IO异常: {}", e.getMessage());
             result.put("message", "网络连接错误");
             result.put("details", e.getMessage());
-            return result;
         } catch (Exception e) {
             logger.error("未知错误: {}", e.getMessage());
             result.put("message", "未知错误");
             result.put("details", e.getMessage());
-            return result;
         }
+
+        return result;
     }
 
+    /**
+     * 保存服务器设置
+     */
     private void saveSettings() {
         String url = serverUrlField.getText().trim();
         if (!validateUrl(url)) {
@@ -179,15 +195,8 @@ public class ServerSettingsController extends BaseController {
                 testConnectionButton.setDisable(false);
 
                 if (isConnected) {
-                    // 保存新URL
-                    appProperties.setServerUrl(url);
-                    appProperties.save();
-                    logger.info("服务器URL已更新: {}", url);
-
-                    // 更新网络状态服务
-                    networkStatusService.checkServerConnection();
-
-                    // 关闭对话框
+                    // 保存新URL并关闭对话框
+                    saveServerUrl(url);
                     dialogStage.close();
                 } else {
                     String message = (String) result.get("message");
@@ -202,45 +211,58 @@ public class ServerSettingsController extends BaseController {
         });
     }
 
+    /**
+     * 强制保存设置，不进行连接检查
+     */
     private void forceSaveSettings() {
         String url = serverUrlField.getText().trim();
-        // 强制保存URL，不进行连接检查
-        appProperties.setServerUrl(url);
-        appProperties.save();
-        logger.info("已强制保存服务器URL: {}", url);
-
-        // 更新网络状态服务
-        networkStatusService.checkServerConnection();
-
-        // 关闭对话框
+        saveServerUrl(url);
         dialogStage.close();
     }
 
+    /**
+     * 保存服务器URL到配置
+     */
+    private void saveServerUrl(String url) {
+        appProperties.setServerUrl(url);
+        appProperties.save();
+        logger.info("服务器URL已更新: {}", url);
+
+        // 更新网络状态服务
+        networkStatusService.checkServerConnection();
+    }
+
+    /**
+     * 取消设置并关闭对话框
+     */
     private void cancelSettings() {
         dialogStage.close();
     }
 
+    /**
+     * 验证URL格式
+     */
     private boolean validateUrl(String url) {
         if (url.isEmpty()) {
             return false;
         }
-
         // 简单URL格式验证
         return url.startsWith("http://") || url.startsWith("https://");
     }
 
+    /**
+     * 显示状态信息
+     */
     private void showStatus(String message, boolean success) {
         statusLabel.setText(message);
-        if (success) {
-            statusLabel.getStyleClass().removeAll("error-label");
-            statusLabel.getStyleClass().add("success-label");
-        } else {
-            statusLabel.getStyleClass().removeAll("success-label");
-            statusLabel.getStyleClass().add("error-label");
-        }
+        statusLabel.getStyleClass().removeAll("error-label", "success-label");
+        statusLabel.getStyleClass().add(success ? "success-label" : "error-label");
         statusLabel.setVisible(true);
     }
 
+    /**
+     * 显示详细状态信息
+     */
     private void showStatusDetails(String details) {
         if (statusDetailsLabel != null) {
             statusDetailsLabel.setText(details);
@@ -248,6 +270,9 @@ public class ServerSettingsController extends BaseController {
         }
     }
 
+    /**
+     * 清除状态信息
+     */
     private void clearStatus() {
         statusLabel.setText("");
         statusLabel.setVisible(false);
