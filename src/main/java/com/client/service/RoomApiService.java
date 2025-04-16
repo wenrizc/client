@@ -1,7 +1,7 @@
 package com.client.service.api;
 
 import com.client.model.Room;
-import com.client.network.ApiException;
+import com.client.exception.ApiException;
 import com.client.session.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -3,7 +3,7 @@ package com.client.service.api;
 import com.client.config.AppProperties;
 import com.client.model.NetworkInfo;
 import com.client.model.User;
-import com.client.network.ApiException;
+import com.client.exception.ApiException;
 import com.client.session.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

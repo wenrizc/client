@@ -1,9 +1,8 @@
 package com.client.service.api;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+import com.client.model.Message;
+import com.client.exception.ApiException;
+import com.client.session.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,12 +10,11 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-
-import com.client.model.Message;
-import com.client.network.ApiException;
-import com.client.session.SessionManager;
-
 import reactor.core.publisher.Mono;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class MessageApiService {
