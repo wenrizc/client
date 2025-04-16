@@ -68,6 +68,8 @@ public class WebSocketService {
     // 状态变量
     private volatile StompSession stompSession;
     private final ConcurrentHashMap<String, SubscriptionEntry<?>> subscriptions = new ConcurrentHashMap<>();
+    // 添加这一行 - 用于存储活动的StompSession.Subscription对象
+    private final ConcurrentHashMap<String, StompSession.Subscription> activeSubscriptions = new ConcurrentHashMap<>();
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private final AtomicBoolean reconnecting = new AtomicBoolean(false);
     private final ReentrantLock reconnectLock = new ReentrantLock();
@@ -138,7 +140,6 @@ public class WebSocketService {
             else if (wsUrl.startsWith("wss://")) wsUrl = "https://" + wsUrl.substring(6);
 
             wsUrl = wsUrl + "?JSESSIONID=" + sessionId;
-
             logger.info("连接WebSocket: {}", wsUrl);
 
             stompClient.setDefaultHeartbeat(new long[] { HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS });
@@ -193,6 +194,8 @@ public class WebSocketService {
         } finally {
             stompSession = null;
             connectionState.set(ConnectionState.DISCONNECTED);
+            // 清空活动订阅
+            activeSubscriptions.clear();
         }
     }
 
@@ -218,6 +221,8 @@ public class WebSocketService {
                 }
 
                 connectionState.set(ConnectionState.DISCONNECTED);
+                // 清空活动订阅
+                activeSubscriptions.clear();
             } finally {
                 cleanDisconnectInProgress.set(false);
                 autoReconnect = true;
@@ -269,8 +274,8 @@ public class WebSocketService {
         subscribe("/topic/lobby.messages", Map.class, messageHandler);
     }
 
-    public void subscribeRoomMessages(Long roomId, Consumer<Message> messageHandler) {
-        subscribe("/topic/room." + roomId + ".messages", Message.class, messageHandler);
+    public void subscribeRoomMessages(Long roomId, Consumer<Map> messageHandler) {
+        subscribe("/topic/room." + roomId + ".messages", Map.class, messageHandler);
     }
 
     public void subscribeUserStatus(Consumer<Map> statusHandler) {
@@ -509,6 +514,9 @@ public class WebSocketService {
         stopHeartbeat();
         stopHealthCheck();
 
+        // 清除活动订阅
+        activeSubscriptions.clear();
+
         if (stompSession != null) {
             try {
                 if (stompSession.isConnected()) stompSession.disconnect();
@@ -555,7 +563,8 @@ public class WebSocketService {
         if (stompSession == null || !stompSession.isConnected()) return;
 
         try {
-            stompSession.subscribe(destination, new StompFrameHandler() {
+            // 存储返回的Subscription对象
+            StompSession.Subscription subscription = stompSession.subscribe(destination, new StompFrameHandler() {
                 @Override
                 public Type getPayloadType(StompHeaders headers) {
                     return payloadType;
@@ -570,6 +579,8 @@ public class WebSocketService {
                     }
                 }
             });
+            // 将订阅对象存储在映射中
+            activeSubscriptions.put(destination, subscription);
         } catch (Exception e) {
             logger.error("订阅 {} 时发生异常: {}", destination, e.getMessage());
             handleDisconnect();
@@ -586,7 +597,7 @@ public class WebSocketService {
             SubscriptionEntry<?> subscription = entry.getValue();
 
             try {
-                stompSession.subscribe(destination, new StompFrameHandler() {
+                StompSession.Subscription stompSubscription = stompSession.subscribe(destination, new StompFrameHandler() {
                     @Override
                     public Type getPayloadType(StompHeaders headers) {
                         return subscription.getType();
@@ -601,6 +612,8 @@ public class WebSocketService {
                         }
                     }
                 });
+                // 将重新订阅的对象存储在映射中
+                activeSubscriptions.put(destination, stompSubscription);
                 successCount++;
             } catch (Exception e) {
                 logger.error("重新订阅 {} 失败: {}", destination, e.getMessage());
@@ -698,7 +711,7 @@ public class WebSocketService {
         if (stompSession != null && stompSession.isConnected()) {
             try {
                 // 获取当前订阅的StompSession.Subscription对象
-                    StompSession.Subscription subscription = activeSubscriptions.get(destination);
+                StompSession.Subscription subscription = activeSubscriptions.get(destination);
                 if (subscription != null) {
                     subscription.unsubscribe();
                     activeSubscriptions.remove(destination);

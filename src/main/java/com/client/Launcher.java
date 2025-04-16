@@ -6,6 +6,7 @@ package com.client;
  */
 public class Launcher {
     public static void main(String[] args) {
+        System.setProperty("jdk.module.illegal.access.warns", "false");
         ClientApplication.main(args);
     }
 }

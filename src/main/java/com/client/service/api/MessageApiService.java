@@ -134,13 +134,13 @@ public class MessageApiService {
     /**
      * 发送房间消息
      */
-    public void sendRoomMessage(Long roomId, String content) {
+    public void sendRoomMessage(Long roomId, String message) {
         if (!sessionManager.hasValidSession()) {
             throw new ApiException("用户未登录", 401);
         }
 
         Map<String, Object> request = new HashMap<>();
-        request.put("content", content);
+        request.put("message", message);
 
         webClient.post()
                 .uri("/api/messages/room/{roomId}", roomId)
@@ -150,8 +150,8 @@ public class MessageApiService {
                 .retrieve()
                 .onStatus(status -> status.isError(), response -> response.bodyToMono(Map.class)
                         .flatMap(errorBody -> {
-                            String message = String.valueOf(errorBody.getOrDefault("error", "发送消息失败"));
-                            return Mono.error(new ApiException(message, response.statusCode().value()));
+                            String err = String.valueOf(errorBody.getOrDefault("error", "发送消息失败"));
+                            return Mono.error(new ApiException(err, response.statusCode().value()));
                         }))
                 .bodyToMono(Void.class)
                 .block();

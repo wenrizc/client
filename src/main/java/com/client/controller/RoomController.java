@@ -92,9 +92,6 @@ public class RoomController extends BaseController {
             chatScrollPane.setVvalue(1.0);
         });
 
-        // 初始化WebSocket连接
-        initWebSocketConnection();
-
         // 加载房间数据
         loadRoomData();
 
@@ -108,8 +105,12 @@ public class RoomController extends BaseController {
                 // 获取当前房间信息
                 Room room = roomApiService.getCurrentUserRoom();
                 if (room != null) {
-                    runOnFXThread(() -> updateRoomInfo(room));
-                    // 加载房间历史消息
+                    runOnFXThread(() -> {
+                        updateRoomInfo(room);
+                        // 在成功获取房间信息后再初始化WebSocket连接
+                        initWebSocketConnection();
+                    });
+                    // 加载房间历史消息ewq
                     loadRoomMessages(room.getId());
                 } else {
                     // 如果找不到房间，返回大厅
@@ -173,20 +174,46 @@ public class RoomController extends BaseController {
     private void updateButtonStates(Room room) {
         if (room == null) return;
 
+        // 获取当前用户名
+        String currentUsername = sessionManager.getCurrentUser().getUsername();
+
         // 只有房主且房间处于等待状态才能开始游戏
-        boolean isCreator = sessionManager.getCurrentUser().getUsername().equals(room.getCreatorUsername());
-        boolean isWaiting = "WAITING".equals(room.getStatus());
-        boolean hasEnoughPlayers = room.getPlayers().size() >= 2;
+        boolean isCreator = currentUsername != null && currentUsername.equals(room.getCreatorUsername());
 
-        startGameButton.setDisable(!isCreator || !isWaiting || !hasEnoughPlayers);
+        // 更灵活地判断房间状态 - 兼容不同格式的状态值
+        String status = room.getStatus();
+        boolean isWaiting = status != null &&
+                (status.equals("WAITING") || status.equalsIgnoreCase("waiting"));
+        boolean isPlaying = status != null &&
+                (status.equals("PLAYING") || status.equalsIgnoreCase("playing"));
 
-        // 游戏进行中显示"结束游戏"而非"开始游戏"
-        if ("PLAYING".equals(room.getStatus()) && isCreator) {
+        boolean hasEnoughPlayers = room.getPlayers() != null && room.getPlayers().size() >= 2;
+
+        // 更新按钮状态
+        if (isPlaying && isCreator) {
+            // 游戏进行中时，房主可以结束游戏
             startGameButton.setText("结束游戏");
             startGameButton.setDisable(false);
         } else {
+            // 非游戏进行中时，显示开始游戏
             startGameButton.setText("开始游戏");
+
+            // 禁用按钮同时添加提示文本
+            boolean shouldDisable = !isCreator || !isWaiting || !hasEnoughPlayers;
+            startGameButton.setDisable(shouldDisable);
+
+            // 添加提示信息
+            if (isCreator && isWaiting && !hasEnoughPlayers) {
+                // 如果是房主、房间等待中，但玩家数量不足，添加提示
+                startGameButton.setTooltip(new Tooltip("需要至少2名玩家才能开始游戏"));
+            } else {
+                startGameButton.setTooltip(null);
+            }
         }
+
+        // 更新房间状态标签
+        String statusText = "房间状态: " + (isWaiting ? "等待中" : isPlaying ? "游戏中" : "未知");
+        roomStatusLabel.setText(statusText);
     }
 
     private void setupPeriodicRefresh() {
@@ -243,10 +270,13 @@ public class RoomController extends BaseController {
         // 取消可能存在的系统消息订阅
         webSocketService.unsubscribeFromSystemNotifications();
 
-        // 只订阅当前房间的更新
-        webSocketService.subscribe("/topic/room." + roomId + ".messages", Map.class, this::handleRoomMessage);
+        // 使用封装的subscribeRoomMessages方法订阅房间消息
+        logger.debug("开始订阅房间 {} 的聊天消息", roomId);
+        webSocketService.subscribeRoomMessages(roomId, this::handleRoomMessage);
+        logger.info("已成功订阅房间 {} 的聊天消息", roomId);
 
-        // 订阅当前房间的状态更新
+        // 订阅房间状态更新
+        logger.debug("开始订阅房间更新主题");
         webSocketService.subscribe("/topic/rooms.updates", Map.class, roomUpdate -> {
             Long updateRoomId = ((Number) roomUpdate.get("roomId")).longValue();
             // 只处理当前房间的更新
@@ -254,11 +284,14 @@ public class RoomController extends BaseController {
                 handleRoomUpdate(roomUpdate);
             }
         });
+        logger.info("已成功订阅房间更新主题");
 
         // 订阅个人通知
+        logger.debug("开始订阅个人通知消息");
         webSocketService.subscribe("/user/queue/notifications", Map.class, this::handleSystemNotification);
+        logger.info("已成功订阅个人通知消息");
 
-        logger.info("已订阅房间 {} 的消息和更新", roomId);
+        logger.info("房间 {} 的所有消息主题订阅完成", roomId);
     }
 
 
@@ -292,14 +325,14 @@ public class RoomController extends BaseController {
     }
 
     private void handleRoomMessage(Map<String, Object> messageData) {
-        String content = (String) messageData.get("content");
+        String message = (String) messageData.get("message");
         String sender = (String) messageData.get("sender");
         Long timestamp = messageData.get("timestamp") instanceof Number ?
                 ((Number) messageData.get("timestamp")).longValue() :
                 System.currentTimeMillis();
 
         Platform.runLater(() -> {
-            addMessageToChat(sender, content, timestamp);
+            addMessageToChat(sender, message, timestamp);
         });
     }
 
@@ -462,7 +495,7 @@ public class RoomController extends BaseController {
                         "• 房主可以开始或结束游戏\n" +
                         "• 使用底部聊天框与其他玩家交流\n" +
                         "• 点击\"连接信息\"查看网络详情\n" +
-                        "• 游戏开始后会启动相应的游戏程序\n" +
+                        "• 点击开始后即可自动进入虚拟局域网\n" +
                         "• 离开房间将返回大厅"
         );
     }
