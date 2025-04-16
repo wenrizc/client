@@ -139,6 +139,15 @@ public class MessageApiService {
             throw new ApiException("用户未登录", 401);
         }
 
+        if (roomId == null) {
+            throw new ApiException("房间ID不能为空", 400);
+        }
+        
+        if (message == null || message.trim().isEmpty()) {
+            throw new ApiException("消息不能为空", 400);
+        }
+    
+
         Map<String, Object> request = new HashMap<>();
         request.put("message", message);
 

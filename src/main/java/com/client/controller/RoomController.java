@@ -43,28 +43,48 @@ public class RoomController extends BaseController {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     // FXML 注入
-    @FXML private Label roomTitleLabel;
-    @FXML private Label userNameLabel;
-    @FXML private Label roomNameLabel;
-    @FXML private Label gameNameLabel;
-    @FXML private Label statusLabel;
-    @FXML private ListView<String> playerListView;
-    @FXML private ScrollPane chatScrollPane;
-    @FXML private VBox chatMessagesBox;
-    @FXML private TextField messageField;
-    @FXML private JFXButton sendButton;
-    @FXML private JFXButton startGameButton;
-    @FXML private JFXButton leaveRoomButton;
-    @FXML private JFXButton networkInfoButton;
-    @FXML private JFXButton helpButton;
-    @FXML private Label roomStatusLabel;
+    @FXML
+    private Label roomTitleLabel;
+    @FXML
+    private Label userNameLabel;
+    @FXML
+    private Label roomNameLabel;
+    @FXML
+    private Label gameNameLabel;
+    @FXML
+    private Label statusLabel;
+    @FXML
+    private ListView<String> playerListView;
+    @FXML
+    private ScrollPane chatScrollPane;
+    @FXML
+    private VBox chatMessagesBox;
+    @FXML
+    private TextField messageField;
+    @FXML
+    private JFXButton sendButton;
+    @FXML
+    private JFXButton startGameButton;
+    @FXML
+    private JFXButton leaveRoomButton;
+    @FXML
+    private JFXButton networkInfoButton;
+    @FXML
+    private JFXButton helpButton;
+    @FXML
+    private Label roomStatusLabel;
 
     // 注入服务
-    @Autowired private RoomApiService roomApiService;
-    @Autowired private UserApiService userApiService;
-    @Autowired private MessageApiService messageApiService;
-    @Autowired private WebSocketService webSocketService;
-    @Autowired private SessionManager sessionManager;
+    @Autowired
+    private RoomApiService roomApiService;
+    @Autowired
+    private UserApiService userApiService;
+    @Autowired
+    private MessageApiService messageApiService;
+    @Autowired
+    private WebSocketService webSocketService;
+    @Autowired
+    private SessionManager sessionManager;
 
     // 数据
     private Room currentRoom;
@@ -115,7 +135,7 @@ public class RoomController extends BaseController {
                 } else {
                     // 如果找不到房间，返回大厅
                     runOnFXThread(() -> {
-                        AlertHelper.showError("错误","房间错误", "无法加载房间信息，将返回大厅");
+                        AlertHelper.showError("错误", "房间错误", "无法加载房间信息，将返回大厅");
                         returnToLobby();
                     });
                 }
@@ -130,7 +150,8 @@ public class RoomController extends BaseController {
     }
 
     private void updateRoomInfo(Room room) {
-        if (room == null) return;
+        if (room == null)
+            return;
 
         currentRoom = room;
 
@@ -172,7 +193,8 @@ public class RoomController extends BaseController {
     }
 
     private void updateButtonStates(Room room) {
-        if (room == null) return;
+        if (room == null)
+            return;
 
         // 获取当前用户名
         String currentUsername = sessionManager.getCurrentUser().getUsername();
@@ -294,9 +316,9 @@ public class RoomController extends BaseController {
         logger.info("房间 {} 的所有消息主题订阅完成", roomId);
     }
 
-
     private void handleRoomUpdate(Map<String, Object> roomData) {
-        if (currentRoom == null) return;
+        if (currentRoom == null)
+            return;
 
         // 获取房间ID和动作
         Number roomId = (Number) roomData.get("roomId");
@@ -327,9 +349,9 @@ public class RoomController extends BaseController {
     private void handleRoomMessage(Map<String, Object> messageData) {
         String message = (String) messageData.get("message");
         String sender = (String) messageData.get("sender");
-        Long timestamp = messageData.get("timestamp") instanceof Number ?
-                ((Number) messageData.get("timestamp")).longValue() :
-                System.currentTimeMillis();
+        Long timestamp = messageData.get("timestamp") instanceof Number
+                ? ((Number) messageData.get("timestamp")).longValue()
+                : System.currentTimeMillis();
 
         Platform.runLater(() -> {
             addMessageToChat(sender, message, timestamp);
@@ -359,8 +381,7 @@ public class RoomController extends BaseController {
                             addMessageToChat(
                                     msg.getSender(),
                                     msg.getMessage(),
-                                    msg.getTimestamp()
-                            );
+                                    msg.getTimestamp());
                         }
                     }
                 });
@@ -375,7 +396,14 @@ public class RoomController extends BaseController {
 
     private void sendMessage() {
         String message = messageField.getText().trim();
-        if (message.isEmpty() || currentRoom == null) return;
+        if (message.isEmpty() || currentRoom == null)
+            return;
+
+        // 添加更严格的检查
+        if (currentRoom == null || currentRoom.getId() == null) {
+            AlertHelper.showError("发送失败", null, "房间信息无效，请尝试重新加入房间");
+            return;
+        }
 
         executeAsync(() -> {
             try {
@@ -383,15 +411,14 @@ public class RoomController extends BaseController {
                 runOnFXThread(() -> messageField.clear());
             } catch (Exception e) {
                 logger.error("发送消息失败", e);
-                runOnFXThread(() ->
-                        AlertHelper.showError("发送失败", null, "无法发送消息: " + e.getMessage())
-                );
+                runOnFXThread(() -> AlertHelper.showError("发送失败", null, "无法发送消息: " + e.getMessage()));
             }
         });
     }
 
     private void startGame() {
-        if (currentRoom == null) return;
+        if (currentRoom == null)
+            return;
 
         // 检查当前状态
         if ("PLAYING".equals(currentRoom.getStatus())) {
@@ -422,7 +449,8 @@ public class RoomController extends BaseController {
     }
 
     private void endGame() {
-        if (currentRoom == null) return;
+        if (currentRoom == null)
+            return;
 
         executeAsync(() -> {
             try {
@@ -458,9 +486,7 @@ public class RoomController extends BaseController {
                 });
             } catch (Exception e) {
                 logger.error("离开房间失败", e);
-                runOnFXThread(() ->
-                        AlertHelper.showError("离开失败", null, "无法离开房间: " + e.getMessage())
-                );
+                runOnFXThread(() -> AlertHelper.showError("离开失败", null, "无法离开房间: " + e.getMessage()));
             }
         });
     }
@@ -473,7 +499,8 @@ public class RoomController extends BaseController {
     }
 
     private void showNetworkInfo() {
-        if (currentRoom == null) return;
+        if (currentRoom == null)
+            return;
 
         StringBuilder info = new StringBuilder();
         info.append("房间虚拟网络信息\n\n");
@@ -496,8 +523,7 @@ public class RoomController extends BaseController {
                         "• 使用底部聊天框与其他玩家交流\n" +
                         "• 点击\"连接信息\"查看网络详情\n" +
                         "• 点击开始后即可自动进入虚拟局域网\n" +
-                        "• 离开房间将返回大厅"
-        );
+                        "• 离开房间将返回大厅");
     }
 
     private void displaySystemMessage(String message) {
@@ -510,10 +536,8 @@ public class RoomController extends BaseController {
         messageContainer.setPadding(new Insets(5));
 
         // 时间戳
-        LocalDateTime time = timestamp > 0 ?
-                LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(timestamp),
-                        java.time.ZoneId.systemDefault()) :
-                LocalDateTime.now();
+        LocalDateTime time = timestamp > 0 ? LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(timestamp),
+                java.time.ZoneId.systemDefault()) : LocalDateTime.now();
         String timeString = "[" + time.format(TIME_FORMATTER) + "] ";
 
         Text timeText = new Text(timeString);
@@ -574,7 +598,8 @@ public class RoomController extends BaseController {
     }
 
     private String formatRoomStatus(String status) {
-        if (status == null) return "未知";
+        if (status == null)
+            return "未知";
 
         switch (status) {
             case "WAITING":

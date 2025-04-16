@@ -240,6 +240,10 @@ public class WebSocketService {
                 doSubscribe(destination, payloadType, messageHandler);
             } catch (Exception e) {
                 logger.error("订阅 {} 失败: {}", destination, e.getMessage());
+                if (heartbeatCheckTask != null) {
+                    heartbeatCheckTask.cancel(true);
+                    checkConnectionHealth();
+                }
             }
         }
     }
@@ -560,8 +564,18 @@ public class WebSocketService {
     // 私有辅助方法
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private <T> void doSubscribe(String destination, Class<T> payloadType, Consumer<T> messageHandler) {
-        if (stompSession == null || !stompSession.isConnected()) return;
-
+        if (stompSession == null || !stompSession.isConnected()) {
+            logger.warn("尝试在未连接状态下订阅 {}", destination);
+            return;
+        }
+        // 检查心跳健康状态
+        long timeSinceLastHeartbeat = Duration.between(lastHeartbeatResponse.get(), Instant.now()).toMillis();
+        if (timeSinceLastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
+            logger.warn("订阅 {} 前检测到心跳超时 ({}ms)，标记连接为不健康", destination, timeSinceLastHeartbeat);
+            connectionState.set(ConnectionState.UNHEALTHY);
+            handleDisconnect();
+            return;
+        }
         try {
             // 存储返回的Subscription对象
             StompSession.Subscription subscription = stompSession.subscribe(destination, new StompFrameHandler() {
