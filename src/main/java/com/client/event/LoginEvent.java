@@ -1,4 +1,4 @@
-package com.client.session;
+package com.client.event;
 
 import com.client.model.User;
 import org.springframework.context.ApplicationEvent;

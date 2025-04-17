@@ -4,7 +4,7 @@ import com.client.config.AppProperties;
 import com.client.model.NetworkInfo;
 import com.client.model.User;
 import com.client.exception.ApiException;
-import com.client.session.SessionManager;
+import com.client.util.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

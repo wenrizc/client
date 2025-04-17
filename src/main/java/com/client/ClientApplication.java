@@ -3,7 +3,7 @@ package com.client;
 import com.client.config.AppProperties;
 import com.client.config.StageManager;
 import com.client.service.UserApiService;
-import com.client.session.SessionManager;
+import com.client.util.SessionManager;
 import com.client.view.FxmlView;
 import javafx.application.Application;
 import javafx.application.Platform;

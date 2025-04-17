@@ -36,7 +36,7 @@ module com.client {
     opens com.client.controller to javafx.fxml, spring.beans, spring.context, spring.core;
     opens com.client.config to spring.beans, spring.context, spring.core;
     opens com.client.service to spring.beans, spring.context, spring.core;
-    opens com.client.session to spring.beans, spring.context, spring.core;
+    opens com.client.event to spring.beans, spring.context, spring.core;
     opens com.client.util to spring.beans, spring.context, spring.core;
     opens com.client.model to spring.beans, spring.context, spring.core, com.fasterxml.jackson.databind;
     opens com.client.exception to spring.beans, spring.context, spring.core;
@@ -50,10 +50,10 @@ module com.client {
     exports com.client.controller;
     exports com.client.config;
     exports com.client.service;
-    exports com.client.session;
     exports com.client.util;
     exports com.client.model;
     exports com.client.exception;
     exports com.client.enums;
     opens com.client.enums to spring.beans, spring.context, spring.core;
+    exports com.client.event;
 }

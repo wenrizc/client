@@ -92,11 +92,9 @@ public class AppProperties {
     }
 
 
-    // 保存配置到文件
     public void save() {
         Properties props = new Properties();
 
-        // 先加载现有配置
         File configFile = new File(CONFIG_FILE);
         if (configFile.exists()) {
             try (FileInputStream in = new FileInputStream(configFile)) {
@@ -106,10 +104,8 @@ public class AppProperties {
             }
         }
 
-        // 更新属性
         props.setProperty("server.url", serverUrl);
 
-        // 保存回文件
         try (FileOutputStream out = new FileOutputStream(configFile)) {
             props.store(out, "Game Hall Client Configuration");
             logger.info("配置已保存到 {}", configFile.getAbsolutePath());

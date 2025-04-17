@@ -7,7 +7,7 @@ import com.client.service.WebSocketService;
 import com.client.service.MessageApiService;
 import com.client.service.RoomApiService;
 import com.client.service.UserApiService;
-import com.client.session.SessionManager;
+import com.client.util.SessionManager;
 import com.client.util.AlertHelper;
 import com.client.view.FxmlView;
 import com.jfoenix.controls.JFXButton;
