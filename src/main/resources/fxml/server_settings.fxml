@@ -43,5 +43,6 @@
     <HBox alignment="CENTER_RIGHT" spacing="10">
         <JFXButton fx:id="cancelButton" text="取消" styleClass="button-flat"/>
         <JFXButton fx:id="saveButton" text="保存" styleClass="button-raised, button-primary"/>
+        <JFXButton fx:id="resetDefaultButton" text="恢复" styleClass="secondary-button" />
     </HBox>
 </VBox>

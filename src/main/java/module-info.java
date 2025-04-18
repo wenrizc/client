@@ -56,4 +56,6 @@ module com.client {
     exports com.client.enums;
     opens com.client.enums to spring.beans, spring.context, spring.core;
     exports com.client.event;
+    exports com.client.util.n2n;
+    opens com.client.util.n2n to spring.beans, spring.context, spring.core;
 }

@@ -1,9 +1,10 @@
 package com.client;
 
 import com.client.config.AppProperties;
-import com.client.config.StageManager;
 import com.client.service.UserApiService;
 import com.client.util.SessionManager;
+import com.client.util.StageManager;
+import com.client.util.n2n.N2NClientManager;
 import com.client.view.FxmlView;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -64,6 +65,12 @@ public class ClientApplication extends Application {
             // 添加自动登出逻辑
             UserApiService userApiService = applicationContext.getBean(UserApiService.class);
             SessionManager sessionManager = applicationContext.getBean(SessionManager.class);
+
+            N2NClientManager n2nClientManager = applicationContext.getBean(N2NClientManager.class);
+            if (n2nClientManager != null && n2nClientManager.isRunning()) {
+                logger.info("应用关闭，正在关闭N2N客户端...");
+                n2nClientManager.stopN2NClient();
+            }
 
             // 如果用户已登录，则发送登出请求
             if (sessionManager.hasValidSession()) {

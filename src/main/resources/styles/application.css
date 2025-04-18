@@ -300,3 +300,12 @@
     -fx-background-color: #e0e0e0;
     -fx-padding: 0 1 0 1;
 }
+
+.secondary-button {
+    -fx-background-color: #9E9E9E;
+    -fx-text-fill: white;
+}
+
+.secondary-button:hover {
+    -fx-background-color: #757575;
+}

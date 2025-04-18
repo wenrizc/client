@@ -3,13 +3,9 @@ package com.client.controller;
 import com.client.model.Message;
 import com.client.model.Room;
 import com.client.model.User;
-import com.client.service.NetworkStatusService;
-import com.client.service.WebSocketService;
-import com.client.service.MessageApiService;
-import com.client.service.RoomApiService;
-import com.client.service.UserApiService;
-import com.client.util.SessionManager;
+import com.client.service.*;
 import com.client.util.AlertHelper;
+import com.client.util.SessionManager;
 import com.client.view.FxmlView;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
@@ -535,18 +531,26 @@ public class LobbyController extends BaseController {
         String message = messageField.getText().trim();
         if (message.isEmpty()) return;
 
-        try {
-            boolean sent = messageApiService.sendLobbyMessage(message);
-            if (sent) {
-                messageField.clear();
-            } else {
-                showErrorAlert("发送失败", "消息发送失败，请重试");
+        // 获取当前用户名
+        String currentUsername = sessionManager.getCurrentUser().getUsername();
+        // 先在本地显示消息
+        long timestamp = System.currentTimeMillis();
+        runOnFXThread(() -> {
+            addMessageToChat(currentUsername, message, timestamp);
+            messageField.clear();
+        });
+
+        // 然后发送到服务器
+        executeAsync(() -> {
+            try {
+                messageApiService.sendLobbyMessage(message);
+            } catch (Exception e) {
+                logger.error("发送消息出错", e);
+                showErrorAlert("发送失败", "消息发送出错: " + e.getMessage());
             }
-        } catch (Exception e) {
-            logger.error("发送消息出错", e);
-            showErrorAlert("发送失败", "消息发送出错: " + e.getMessage());
-        }
+        });
     }
+
 
     /**
      * 添加消息到聊天区域
@@ -593,7 +597,12 @@ public class LobbyController extends BaseController {
         String message = (String) messageData.get("message");
         Long timestamp = (Long) messageData.get("timestamp");
 
-        if (sender != null && message != null) {
+        // 检查发送者是否是当前用户
+        String currentUsername = sessionManager.getCurrentUser() != null ?
+                sessionManager.getCurrentUser().getUsername() : null;
+
+        // 如果不是自己发的消息才显示，避免重复
+        if (sender != null && message != null && (currentUsername == null || !currentUsername.equals(sender))) {
             Platform.runLater(() ->
                     addMessageToChat(sender, message, timestamp != null ? timestamp : System.currentTimeMillis())
             );

@@ -3,12 +3,10 @@ package com.client.controller;
 import com.client.model.Message;
 import com.client.model.Room;
 import com.client.model.User;
-import com.client.service.WebSocketService;
-import com.client.service.MessageApiService;
-import com.client.service.RoomApiService;
-import com.client.service.UserApiService;
-import com.client.util.SessionManager;
+import com.client.service.*;
 import com.client.util.AlertHelper;
+import com.client.util.SessionManager;
+import com.client.util.n2n.N2NClientManager;
 import com.client.view.FxmlView;
 import com.jfoenix.controls.JFXButton;
 import javafx.application.Platform;
@@ -62,12 +60,15 @@ public class RoomController extends BaseController {
     @FXML private JFXButton networkInfoButton;
     @FXML private JFXButton helpButton;
     @FXML private Label roomStatusLabel;
+    @FXML private JFXButton n2nStatusButton;
 
     @Autowired private RoomApiService roomApiService;
     @Autowired private UserApiService userApiService;
     @Autowired private MessageApiService messageApiService;
     @Autowired private WebSocketService webSocketService;
     @Autowired private SessionManager sessionManager;
+    @Autowired private N2NClientManager n2nClientManager;
+    @Autowired private VirtualNetworkService virtualNetworkService;
 
     // 房间数据
     private Room currentRoom;
@@ -91,6 +92,7 @@ public class RoomController extends BaseController {
         startGameButton.setOnAction(event -> startGame());
         leaveRoomButton.setOnAction(event -> leaveRoom());
         networkInfoButton.setOnAction(event -> showNetworkInfo());
+        n2nStatusButton.setOnAction(event -> showN2NStatus());
         helpButton.setOnAction(event -> showHelpDialog());
 
         // 自动滚动聊天窗口
@@ -419,11 +421,18 @@ public class RoomController extends BaseController {
     private void handleRoomMessage(Map<String, Object> messageData) {
         String message = (String) messageData.get("message");
         String sender = (String) messageData.get("sender");
-        Long timestamp = messageData.get("timestamp") instanceof Number
+        long timestamp = messageData.get("timestamp") instanceof Number
                 ? ((Number) messageData.get("timestamp")).longValue()
                 : System.currentTimeMillis();
 
-        Platform.runLater(() -> addMessageToChat(sender, message, timestamp));
+        // 检查发送者是否是当前用户
+        String currentUsername = sessionManager.getCurrentUser() != null ?
+                sessionManager.getCurrentUser().getUsername() : null;
+
+        // 如果不是自己发的消息才显示，避免重复
+        if (currentUsername == null || !currentUsername.equals(sender)) {
+            Platform.runLater(() -> addMessageToChat(sender, message, timestamp));
+        }
     }
 
     /**
@@ -448,10 +457,19 @@ public class RoomController extends BaseController {
             return;
         }
 
+        // 获取当前用户名
+        String currentUsername = sessionManager.getCurrentUser().getUsername();
+        // 先在本地显示消息
+        long timestamp = System.currentTimeMillis();
+        runOnFXThread(() -> {
+            addMessageToChat(currentUsername, message, timestamp);
+            messageField.clear();
+        });
+
+        // 然后发送到服务器
         executeAsync(() -> {
             try {
                 messageApiService.sendRoomMessage(currentRoom.getId(), message);
-                runOnFXThread(() -> messageField.clear());
             } catch (Exception e) {
                 logger.error("发送消息失败", e);
                 runOnFXThread(() -> AlertHelper.showError("发送失败", null, "无法发送消息: " + e.getMessage()));
@@ -523,6 +541,22 @@ public class RoomController extends BaseController {
      * 离开房间
      */
     private void leaveRoom() {
+        logger.info("退出房间: {}", currentRoom.getId());
+
+        // 确认对话框
+        boolean confirmed = AlertHelper.showConfirmation(
+                "退出房间",
+                "确认退出房间?",
+                "退出后将断开与其他玩家的连接，确定要退出吗？"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        // 停止N2N相关任务
+        stopN2NMonitoringAndClient();
+
         executeAsync(() -> {
             try {
                 boolean success = roomApiService.leaveRoom();
@@ -636,4 +670,44 @@ public class RoomController extends BaseController {
             default: return status;
         }
     }
+
+    /**
+     * 显示N2N状态界面
+     */
+    private void showN2NStatus() {
+        logger.info("打开N2N状态界面");
+        try {
+            stageManager.openDialog(FxmlView.N2N_STATUS);
+        } catch (Exception e) {
+            logger.error("打开N2N状态界面失败", e);
+            AlertHelper.showError("错误", null, "无法打开N2N状态界面: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 停止N2N监控和客户端
+     * 在退出房间时调用，确保释放所有N2N相关资源
+     */
+    private void stopN2NMonitoringAndClient() {
+        logger.info("停止N2N监控和客户端进程");
+
+        // 关闭N2N客户端进程
+        if (n2nClientManager != null && n2nClientManager.isRunning()) {
+            try {
+                logger.info("停止N2N客户端进程");
+                n2nClientManager.stopN2NClient();
+            } catch (Exception e) {
+                logger.error("停止N2N客户端失败", e);
+            }
+        }
+
+        // 通过虚拟网络服务关闭网络连接
+        try {
+            logger.info("断开虚拟网络连接");
+            virtualNetworkService.disconnectFromNetwork();
+        } catch (Exception e) {
+            logger.error("断开虚拟网络连接失败", e);
+        }
+    }
+
 }

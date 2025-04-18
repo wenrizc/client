@@ -1,8 +1,8 @@
 package com.client.controller;
 
 import com.client.config.AppProperties;
-import com.client.config.StageManager;
 import com.client.util.ResourceUtil;
+import com.client.util.StageManager;
 import jakarta.annotation.Resource;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
@@ -11,9 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-
-import java.util.concurrent.*;
-import java.util.function.Consumer;
 
 /**
  * 控制器基类

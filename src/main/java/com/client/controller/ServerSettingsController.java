@@ -33,6 +33,7 @@ public class ServerSettingsController extends BaseController {
     @FXML private JFXButton cancelButton;
     @FXML private Label statusLabel;
     @FXML private Label statusDetailsLabel;
+    @FXML private JFXButton resetDefaultButton;
 
     @Autowired
     private AppProperties appProperties;
@@ -55,16 +56,19 @@ public class ServerSettingsController extends BaseController {
     public void initialize() {
         logger.info("初始化服务器设置控制器");
 
-        // 显示当前服务器URL
-        serverUrlField.setText(appProperties.getServerUrl());
+        // 显示当前服务器URL或"默认"
+        updateServerUrlDisplay();
 
         // 设置按钮事件
         testConnectionButton.setOnAction(event -> testConnection());
         saveButton.setOnAction(event -> saveSettings());
         cancelButton.setOnAction(event -> cancelSettings());
+        resetDefaultButton.setOnAction(event -> resetToDefault());
 
         // 添加输入监听，清除状态
-        serverUrlField.textProperty().addListener((obs, oldVal, newVal) -> clearStatus());
+        serverUrlField.textProperty().addListener((obs, oldVal, newVal) -> {
+            clearStatus();
+        });
 
         // 初始化状态详情标签
         if (statusDetailsLabel != null) {
@@ -74,14 +78,38 @@ public class ServerSettingsController extends BaseController {
     }
 
     /**
+     * 更新服务器URL显示
+     * 当使用默认URL时显示"默认"
+     */
+    private void updateServerUrlDisplay() {
+        if (appProperties.isDefaultServerUrl()) {
+            serverUrlField.setText("默认");
+        } else {
+            serverUrlField.setText(appProperties.getServerUrl());
+        }
+    }
+
+    /**
+     * 重置为默认服务器
+     */
+    private void resetToDefault() {
+        appProperties.resetToDefaultServerUrl();
+        updateServerUrlDisplay();
+        showStatus("已重置为默认服务器", true);
+
+        // 更新网络状态服务
+        networkStatusService.checkServerConnection();
+    }
+
+
+    /**
      * 测试服务器连接
      */
     private void testConnection() {
         String url = serverUrlField.getText().trim();
-        if (!validateUrl(url)) {
-            showStatus("无效的服务器URL", false);
-            showStatusDetails("URL必须以http://或https://开头");
-            return;
+
+        if ("默认".equals(url)) {
+            url = AppProperties.DEFAULT_SERVER_URL;
         }
 
         testConnectionButton.setDisable(true);
@@ -89,8 +117,9 @@ public class ServerSettingsController extends BaseController {
         showStatus("正在测试连接...", true);
         showStatusDetails("正在连接到服务器，请稍候...");
 
+        String finalUrl = url;
         executeAsync(() -> {
-            Map<String, Object> result = checkServerConnection(url);
+            Map<String, Object> result = checkServerConnection(finalUrl);
             boolean isConnected = (boolean) result.get("success");
             String message = (String) result.get("message");
             String details = (String) result.get("details");
@@ -177,18 +206,19 @@ public class ServerSettingsController extends BaseController {
      */
     private void saveSettings() {
         String url = serverUrlField.getText().trim();
-        if (!validateUrl(url)) {
-            showStatus("无效的服务器URL", false);
-            showStatusDetails("URL必须以http://或https://开头");
-            return;
+
+        // 如果输入为"默认"，使用默认URL
+        if ("默认".equals(url)) {
+            url = AppProperties.DEFAULT_SERVER_URL;
         }
 
         // 保存新URL前先测试连接
         testConnectionButton.setDisable(true);
         showStatus("验证服务器连接...", true);
 
+        String finalUrl = url;
         executeAsync(() -> {
-            Map<String, Object> result = checkServerConnection(url);
+            Map<String, Object> result = checkServerConnection(finalUrl);
             boolean isConnected = (boolean) result.get("success");
 
             Platform.runLater(() -> {
@@ -196,7 +226,7 @@ public class ServerSettingsController extends BaseController {
 
                 if (isConnected) {
                     // 保存新URL并关闭对话框
-                    saveServerUrl(url);
+                    saveServerUrl(finalUrl);
                     dialogStage.close();
                 } else {
                     String message = (String) result.get("message");
@@ -240,17 +270,6 @@ public class ServerSettingsController extends BaseController {
     }
 
     /**
-     * 验证URL格式
-     */
-    private boolean validateUrl(String url) {
-        if (url.isEmpty()) {
-            return false;
-        }
-        // 简单URL格式验证
-        return url.startsWith("http://") || url.startsWith("https://");
-    }
-
-    /**
      * 显示状态信息
      */
     private void showStatus(String message, boolean success) {
@@ -284,5 +303,15 @@ public class ServerSettingsController extends BaseController {
 
         // 重置保存按钮行为
         saveButton.setOnAction(event -> saveSettings());
+    }
+
+    /**
+     * 当点击服务器URL输入框时，如果显示"默认"，则清空准备输入
+     */
+    @FXML
+    private void onServerUrlFieldClicked() {
+        if ("默认".equals(serverUrlField.getText())) {
+            serverUrlField.setText("");
+        }
     }
 }

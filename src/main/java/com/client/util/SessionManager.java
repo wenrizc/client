@@ -18,9 +18,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.prefs.Preferences;
 
-/**
- * 会话管理器，负责维护用户会话状态
- */
+
 @Component
 public class SessionManager {
     private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);

@@ -6,12 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
-/**
- * WebClient配置类
- * <p>
- * 提供全局WebClient实例以供服务层调用外部API
- * </p>
- */
+
 @Configuration
 public class WebClientConfig {
 

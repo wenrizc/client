@@ -1,10 +1,10 @@
 package com.client.service;
 
 import com.client.config.AppProperties;
-import com.client.model.Room;
 import com.client.enums.ConnectionState;
 import com.client.event.ConnectionFailedEvent;
 import com.client.event.ReconnectSuccessEvent;
+import com.client.model.Room;
 import com.client.util.SessionManager;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -153,6 +153,7 @@ public class WebSocketService {
             connectionState.set(ConnectionState.CONNECTED);
             heartbeatFailures.set(0);
             consecutiveHeartbeatSuccesses.set(0);
+            lastHeartbeatResponse.set(Instant.now());
 
             // 初始化连接后操作
             resubscribeAll();
@@ -247,10 +248,24 @@ public class WebSocketService {
             return;
         }
 
+        logger.info("处理WebSocket断开连接");
         connectionState.set(ConnectionState.DISCONNECTED);
         stopHeartbeat();
         stopHealthCheck();
         activeSubscriptions.clear();
+
+        if (heartbeatTask != null) {
+            heartbeatTask.cancel(true);
+            heartbeatTask = null;
+        }
+        if (heartbeatCheckTask != null) {
+            heartbeatCheckTask.cancel(true);
+            heartbeatCheckTask = null;
+        }
+        if (healthCheckTask != null) {
+            healthCheckTask.cancel(true);
+            healthCheckTask = null;
+        }
 
         if (stompSession != null) {
             try {
@@ -299,7 +314,8 @@ public class WebSocketService {
 
             // 使用指数退避策略计算延迟时间
             long delay = Math.min(
-                    INITIAL_RECONNECT_DELAY_MS * (long) Math.pow(2, attempts - 1),
+                    INITIAL_RECONNECT_DELAY_MS * (long) Math.pow(2, attempts - 1) +
+                            (long)(Math.random() * 1000), // 添加随机抖动
                     MAX_RECONNECT_DELAY_MS);
 
             logger.info("计划在 {}ms 后重连 (尝试 {}/{})", delay, attempts, MAX_RECONNECT_ATTEMPTS);
@@ -377,10 +393,16 @@ public class WebSocketService {
 
         // 检查心跳健康状态
         long timeSinceLastHeartbeat = Duration.between(lastHeartbeatResponse.get(), Instant.now()).toMillis();
-        if (timeSinceLastHeartbeat > HEARTBEAT_TIMEOUT_MS) {
+        if (timeSinceLastHeartbeat > HEARTBEAT_TIMEOUT_MS &&
+                timeSinceLastHeartbeat < 3 * HEARTBEAT_TIMEOUT_MS) { // 添加上限检查
             logger.warn("订阅 {} 前检测到心跳超时 ({}ms)，标记连接为不健康", destination, timeSinceLastHeartbeat);
             connectionState.set(ConnectionState.UNHEALTHY);
             handleDisconnect();
+            return;
+        } else if (timeSinceLastHeartbeat >= 3 * HEARTBEAT_TIMEOUT_MS) {
+            // 如果超时时间异常大，说明lastHeartbeatResponse可能未正确初始化
+            logger.warn("订阅 {} 前检测到异常的心跳超时值 ({}ms)，重置心跳时间", destination, timeSinceLastHeartbeat);
+            lastHeartbeatResponse.set(Instant.now());  // 重置心跳时间
             return;
         }
 
@@ -688,7 +710,13 @@ public class WebSocketService {
      * 处理心跳响应
      */
     public void handleHeartbeatResponse() {
-        lastHeartbeatResponse.set(Instant.now());
+        Instant now = Instant.now();
+        Instant previous = lastHeartbeatResponse.getAndSet(now);
+        long timeSinceLastUpdate = Duration.between(previous, now).toMillis();
+
+        // 添加日志，帮助诊断
+        logger.debug("收到心跳响应，距上次心跳: {}ms", timeSinceLastUpdate);
+
         if (connectionState.get() == ConnectionState.UNHEALTHY) {
             connectionState.set(ConnectionState.CONNECTED);
         }

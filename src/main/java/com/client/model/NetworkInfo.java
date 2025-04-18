@@ -12,6 +12,8 @@ public class NetworkInfo {
     private String networkId;
     private String networkName;
     private String networkType;
+    private String networkSecret;
+    private String supernode;
 
     public NetworkInfo() {
     }
@@ -80,6 +82,23 @@ public class NetworkInfo {
         this.networkType = networkType;
     }
 
+    // 新增的getter和setter
+    public String getNetworkSecret() {
+        return networkSecret;
+    }
+
+    public void setNetworkSecret(String networkSecret) {
+        this.networkSecret = networkSecret;
+    }
+
+    public String getSupernode() {
+        return supernode;
+    }
+
+    public void setSupernode(String supernode) {
+        this.supernode = supernode;
+    }
+
     @Override
     public String toString() {
         return "NetworkInfo{" +
@@ -91,6 +110,7 @@ public class NetworkInfo {
                 ", networkId='" + networkId + '\'' +
                 ", networkName='" + networkName + '\'' +
                 ", networkType='" + networkType + '\'' +
+                ", supernode='" + supernode + '\'' +
                 '}';
     }
 }

@@ -1,9 +1,9 @@
 package com.client.service;
 
 import com.client.config.AppProperties;
+import com.client.exception.ApiException;
 import com.client.model.NetworkInfo;
 import com.client.model.User;
-import com.client.exception.ApiException;
 import com.client.util.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -317,12 +317,17 @@ public class UserApiService {
                 info.setNetworkName((String) data.get("networkName"));
                 info.setNetworkType((String) data.get("networkType"));
 
+                info.setNetworkSecret((String) data.get("networkSecret"));
+                info.setSupernode((String) data.get("supernode"));
+
                 return info;
             }
+
+            logger.warn("获取网络信息失败: 返回数据格式错误");
             throw new ApiException("获取网络信息失败: 返回格式错误", 500);
         } catch (Exception e) {
             handleApiException(e, "获取网络信息失败");
-            return null; // 不会执行到这里，handleApiException会抛出异常
+            return null;
         }
     }
 
