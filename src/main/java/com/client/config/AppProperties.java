@@ -1,22 +1,28 @@
 package com.client.config;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
 @Component
 public class AppProperties {
 
     private static final Logger logger = LoggerFactory.getLogger(AppProperties.class);
     private static final String CONFIG_FILE = "application.properties";
-    public static final String DEFAULT_SERVER_URL = "http://localhost:8080";
+    public static final String DEFAULT_SERVER_URL = "http://localhost:1104";
+    public static final String DEFAULT_WS_SERVER_URL = "ws://localhost:1104/ws";
+
+    public AppProperties() {
+        serverUrl = DEFAULT_SERVER_URL;
+        wsServerUrl = DEFAULT_WS_SERVER_URL;
+    }
 
     @Value("${server.url}")
     private String serverUrl;
