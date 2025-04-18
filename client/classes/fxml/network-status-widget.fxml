@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.shape.Circle?>
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.client.controller.NetworkStatusController"
+      spacing="5" alignment="CENTER_LEFT">
+
+    <padding>
+        <Insets top="5" right="10" bottom="5" left="10"/>
+    </padding>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="服务器："/>
+        <Circle fx:id="serverStatusIndicator" radius="5"/>
+        <Label fx:id="serverStatusLabel" text="未连接"/>
+    </HBox>
+
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="虚拟网络："/>
+        <Circle fx:id="n2nStatusIndicator" radius="5"/>
+        <Label fx:id="n2nStatusLabel" text="未连接"/>
+    </HBox>
+
+    <Button fx:id="reconnectButton" text="重新连接" minWidth="100"/>
+</VBox>

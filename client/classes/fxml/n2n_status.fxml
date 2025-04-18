@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<BorderPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.client.controller.N2NStatusController"
+            prefHeight="600.0" prefWidth="800.0">
+    <padding>
+        <Insets top="15.0" right="15.0" bottom="15.0" left="15.0"/>
+    </padding>
+
+    <top>
+        <VBox spacing="10.0">
+            <HBox spacing="10.0">
+                <Label text="N2N状态:" style="-fx-font-weight: bold"/>
+                <TextField fx:id="statusField" editable="false" prefWidth="100.0"/>
+
+                <Label text="网络ID:" style="-fx-font-weight: bold"/>
+                <TextField fx:id="networkIdField" editable="false" prefWidth="150.0"/>
+
+                <Label text="运行时间:" style="-fx-font-weight: bold"/>
+                <TextField fx:id="uptimeField" editable="false" prefWidth="150.0"/>
+
+                <Button text="刷新" onAction="#refreshStatus"/>
+                <Button text="清空日志" onAction="#clearLogs"/>
+            </HBox>
+
+            <Label text="命令行:" style="-fx-font-weight: bold"/>
+            <TextArea fx:id="commandField" editable="false" prefHeight="40.0" wrapText="true"/>
+        </VBox>
+    </top>
+
+    <center>
+        <TabPane>
+            <Tab text="输出日志" closable="false">
+                <ListView fx:id="outputLogList" prefHeight="400.0"/>
+            </Tab>
+            <Tab text="错误日志" closable="false">
+                <ListView fx:id="errorLogList" prefHeight="400.0"/>
+            </Tab>
+        </TabPane>
+    </center>
+</BorderPane>
